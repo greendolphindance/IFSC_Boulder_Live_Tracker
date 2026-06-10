@@ -71,7 +71,7 @@ function readRoundUrl(query: { roundUrl?: string | string[] } | undefined) {
   }
   if (roundUrl === "demo:lead-semifinal" || roundUrl === "demo:lead-final") return roundUrl;
   if (!/^https:\/\/ifsc\.results\.info\/event\/\d+\/cr\/\d+\/?$/.test(roundUrl)) {
-    throw new Error("Unsupported IFSC round URL. Use a URL like https://ifsc.results.info/event/1480/cr/10677");
+    throw new Error("Unsupported IFSC round URL. Use a URL like https://ifsc.results.info/event/1515/cr/10704");
   }
   return roundUrl;
 }

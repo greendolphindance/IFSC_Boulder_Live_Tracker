@@ -3,6 +3,9 @@ import type { Appeal, Athlete, BoulderResult, CompetitionSnapshot, LeadGender, L
 import type { Browser, Page } from "playwright";
 
 const DEFAULT_IFSC_ROUND_URL = "https://ifsc.results.info/event/1515/cr/10704";
+const OLD_DEFAULT_IFSC_ROUND_URLS = new Set([
+  "https://ifsc.results.info/event/1480/cr/10677"
+]);
 
 export interface RoundSource {
   nextSnapshot(): Promise<CompetitionSnapshot>;
@@ -336,10 +339,10 @@ export function createRoundSourceFromEnv(): RoundSource {
     return new DemoSingleGroupRoundSource("Final", 8, [1, 5]);
   }
   if (process.env.COMP_SOURCE === "ifsc-browser") {
-    return new IfscBrowserRoundSource(process.env.IFSC_ROUND_URL ?? DEFAULT_IFSC_ROUND_URL);
+    return new IfscBrowserRoundSource(defaultIfscRoundUrl());
   }
   if (process.env.COMP_SOURCE === "ifsc" || process.env.IFSC_ROUND_URL) {
-    return new IfscRestRoundSource(process.env.IFSC_ROUND_URL ?? DEFAULT_IFSC_ROUND_URL);
+    return new IfscRestRoundSource(defaultIfscRoundUrl());
   }
   return new IfscRestRoundSource(DEFAULT_IFSC_ROUND_URL);
 }
@@ -348,6 +351,12 @@ export function createRoundSourceFromUrl(roundUrl: string): RoundSource {
   if (roundUrl === "demo:lead-semifinal") return new DemoLeadRoundSource("Semi-final");
   if (roundUrl === "demo:lead-final") return new DemoLeadRoundSource("Final");
   return new IfscRestRoundSource(roundUrl);
+}
+
+function defaultIfscRoundUrl() {
+  const configured = process.env.IFSC_ROUND_URL?.trim();
+  if (!configured || OLD_DEFAULT_IFSC_ROUND_URLS.has(configured)) return DEFAULT_IFSC_ROUND_URL;
+  return configured;
 }
 
 export class DemoQualificationRoundSource implements RoundSource {
