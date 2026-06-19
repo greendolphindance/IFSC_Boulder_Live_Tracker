@@ -30,6 +30,23 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const mode = theme === "theme-dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = mode;
+    document.documentElement.style.colorScheme = mode;
+    document.documentElement.classList.toggle("theme-dark", theme === "theme-dark");
+    document.documentElement.classList.toggle("theme-light", theme === "theme-light");
+    document.body.classList.toggle("theme-dark-body", theme === "theme-dark");
+    document.body.classList.toggle("theme-light-body", theme === "theme-light");
+
+    return () => {
+      document.documentElement.classList.remove("theme-dark", "theme-light");
+      document.body.classList.remove("theme-dark-body", "theme-light-body");
+      document.documentElement.style.colorScheme = "";
+      delete document.documentElement.dataset.theme;
+    };
+  }, [theme]);
+
+  useEffect(() => {
     window.localStorage.setItem("ifsc-live-tab", tab);
   }, [tab]);
 

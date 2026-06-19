@@ -1,8 +1,18 @@
 :root {
-  color-scheme: dark;
+  color-scheme: dark light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #070a0f;
   color: #eef3f8;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  background: #070a0f;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  background: #f5f7fb;
 }
 
 * {
@@ -13,6 +23,16 @@ body {
   margin: 0;
   min-width: 0;
   background: #070a0f;
+}
+
+body.theme-dark-body {
+  background: #070a0f;
+  color: #eef3f8;
+}
+
+body.theme-light-body {
+  background: #f5f7fb;
+  color: #182433;
 }
 
 button {
@@ -1509,6 +1529,220 @@ pre {
   padding: 14px;
   background: #070c12;
   border-radius: 6px;
+  color: #cdd9e5;
+}
+
+.theme-dark {
+  background: #070a0f;
+  color: #eef3f8;
+}
+
+.theme-dark .topbar,
+.theme-dark .link-panel,
+.theme-dark .panel,
+.theme-dark .route-tile,
+.theme-dark .ranking-panel.boxed .ranking-row,
+.theme-dark .next-row,
+.theme-dark .appeal-row,
+.theme-dark .rank-row,
+.theme-dark .timeline-item {
+  background: #0d141d;
+  border-color: #1f3144;
+}
+
+.theme-dark .route-tile,
+.theme-dark .ranking-panel.boxed .ranking-row,
+.theme-dark .lead-status-card,
+.theme-dark .lead-axis-wrap {
+  background: #0b1219;
+  border-color: #2b4962;
+}
+
+.theme-dark .tabs button,
+.theme-dark .round-url-row input,
+.theme-dark .theme-toggle,
+.theme-dark .theme-switch {
+  background: #0c121a;
+  border-color: #223449;
+  color: #dce8f2;
+}
+
+.theme-dark .round-url-row button,
+.theme-dark .error-actions button,
+.theme-dark .feed-top-button {
+  background: #143047;
+  border-color: #3b84b6;
+  color: #ffffff;
+}
+
+.theme-dark .tabs button.active {
+  background: #143047;
+  border-color: #7fd7ff;
+  color: #ffffff;
+}
+
+.theme-dark p,
+.theme-dark .link-panel label,
+.theme-dark .status-cluster,
+.theme-dark .next-line,
+.theme-dark .ranking-row strong,
+.theme-dark .score-block strong,
+.theme-dark .empty {
+  color: #94a8ba;
+}
+
+.theme-dark .section-title,
+.theme-dark .athlete-name,
+.theme-dark .ranking-name {
+  color: #d8e8f5;
+}
+
+.theme-dark .link-panel a,
+.theme-dark .eyebrow,
+.theme-dark .discipline-label,
+.theme-dark .group-title,
+.theme-dark .ranking-group-title,
+.theme-dark .lead-card-title {
+  color: #7fd7ff;
+}
+
+.theme-dark .route-id {
+  background: #143047;
+  color: #ffffff;
+}
+
+.theme-dark .mini-cell,
+.theme-dark .ranking-cell {
+  background: #070c12;
+  border-color: #29435a;
+}
+
+.theme-dark .mini-cell.zone,
+.theme-dark .ranking-cell.zone {
+  background: linear-gradient(180deg, #070c12 50%, #157d52 50%);
+}
+
+.theme-dark .mini-cell.top,
+.theme-dark .ranking-cell.top {
+  background: #157d52;
+  color: #ffffff;
+}
+
+.theme-dark .active-route,
+.theme-dark .ranking-row.active-ranking,
+.theme-dark .ranking-row.active-ranking::after {
+  border-color: #2ee88b;
+}
+
+.theme-dark .mini-cell.current,
+.theme-dark .ranking-cell.current {
+  border-color: #2ee88b;
+  outline-color: #2ee88b;
+}
+
+.theme-dark .mini-attempt,
+.theme-dark .mini-attempt-side,
+.theme-dark .ranking-attempt,
+.theme-dark .ranking-attempt-side,
+.theme-dark .score-block span,
+.theme-dark .ranking-score {
+  color: #5df0a4;
+}
+
+.theme-dark .ranking-row {
+  border-bottom-color: #172839;
+}
+
+.theme-dark .status-dot {
+  background: #8994a0;
+}
+
+.theme-dark .status-dot.connected,
+.theme-light .status-dot.connected {
+  background: #35d07f;
+  box-shadow: 0 0 16px #35d07f;
+}
+
+.theme-dark .event-row time {
+  color: #7fd7ff;
+}
+
+.theme-dark .event-row.event-rank-up span {
+  color: #ff8fcb;
+}
+
+.theme-dark .event-row.event-rank-down span,
+.theme-dark .event-row.event-fall span {
+  color: #ff6b6b;
+}
+
+.theme-dark .event-row.event-appeal span {
+  color: #ffd166;
+}
+
+.theme-dark .event-row.event-top span {
+  color: #5df0a4;
+}
+
+.theme-dark .event-row.event-zone span {
+  color: #7fd7ff;
+}
+
+.theme-dark .event-row.event-start span,
+.theme-dark .event-row.event-default span {
+  color: #dce8f2;
+}
+
+.theme-dark .lead-athlete-name,
+.theme-dark .lead-score,
+.theme-dark .lead-ranking-row.lead-climbing b,
+.theme-dark .lead-ranking-row.lead-climbing span {
+  color: #5df0a4;
+}
+
+.theme-dark .lead-ranking-row,
+.theme-dark .lead-axis-point.lead-climbing b,
+.theme-dark .lead-score-fall,
+.theme-dark .lead-ranking-row b,
+.theme-dark .lead-ranking-row.lead-fall b {
+  color: #dce8f2;
+}
+
+.theme-dark .lead-meta,
+.theme-dark .lead-next,
+.theme-dark .lead-axis-mark,
+.theme-dark .lead-ranking-row strong,
+.theme-dark .lead-axis-point b {
+  color: #94a8ba;
+}
+
+.theme-dark .lead-ranking-row.under-appeal b,
+.theme-dark .lead-ranking-row.under-appeal small {
+  color: #ff6b6b;
+}
+
+.theme-dark .lead-ranking-row {
+  border-bottom-color: #172839;
+}
+
+.theme-dark .lead-ranking-row.lead-climbing {
+  border-color: #2ee88b;
+}
+
+.theme-dark .lead-axis {
+  border-left-color: #708397;
+}
+
+.theme-dark .lead-axis-point span {
+  border-color: #0b1219;
+}
+
+.theme-dark .lead-magnifier-preview {
+  background: #0b1219;
+}
+
+.theme-dark pre {
+  background: #070c12;
   color: #cdd9e5;
 }
 

@@ -544,10 +544,11 @@ function MiniCell({ boulder, current, currentAttempt, small = false, inferredNoS
 
 function eventTypeClass(event: CompetitionEvent) {
   if (event.type === "RANK_CHANGED") {
-    const match = event.reason.match(/Rank (\d+) -> (\d+)/);
+    const match = event.reason.match(/Rank\s+(\d+)\s*->\s*(?:Rank\s*)?(\d+)/i);
     const before = Number(match?.[1]);
     const after = Number(match?.[2]);
     if (Number.isFinite(before) && Number.isFinite(after)) return after < before ? "event-rank-up" : "event-rank-down";
+    if (/passed/i.test(event.message)) return "event-rank-up";
     return "event-default";
   }
   if (event.reason === "lead-fall") return "event-fall";
