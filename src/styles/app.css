@@ -1298,8 +1298,8 @@ p {
 }
 
 .lead-axis-wrap {
-  height: calc(100vh - 240px);
-  min-height: 720px;
+  height: 75vh;
+  min-height: 0;
   padding: 55px 14px 55px 86px;
   border: 1px solid #2b4962;
   border-radius: 8px;
@@ -2655,14 +2655,13 @@ pre {
   }
 
   .lead-axis-wrap {
-    min-height: 420px;
-    height: calc(100dvh - 250px);
+    min-height: 0;
+    height: 75dvh;
     padding: 32px 14px 32px 64px;
   }
 
   .lead-axis-wrap.expanded {
-    height: calc((100dvh - 250px) * 3);
-    min-height: 1260px;
+    min-height: 0;
   }
 
   .lead-magnifier-button,

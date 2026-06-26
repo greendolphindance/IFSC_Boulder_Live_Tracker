@@ -299,6 +299,7 @@ export function EventFeed({ events, athletes }: { events: CompetitionEvent[]; at
   const feedRef = useRef<HTMLDivElement>(null);
   const scrollKey = `ifsc-event-feed-scroll:${athletes.map((result) => result.athlete.id).join("-")}`;
   const restoredRef = useRef(false);
+  const visibleEvents = events.filter((event) => !isRankDownEvent(event));
 
   useEffect(() => {
     if (restoredRef.current || !feedRef.current) return;
@@ -317,7 +318,7 @@ export function EventFeed({ events, athletes }: { events: CompetitionEvent[]; at
         }}>↑</button>
       </div>
       <div className="event-list scrollable-feed" ref={feedRef} onScroll={(event) => window.localStorage.setItem(scrollKey, String(event.currentTarget.scrollTop))}>
-        {events.length === 0 ? <div className="empty compact-empty">No competition events in this session.</div> : events.map((event) => (
+        {visibleEvents.length === 0 ? <div className="empty compact-empty">No competition events in this session.</div> : visibleEvents.map((event) => (
           <div className={`event-row ${eventTypeClass(event)}`} key={event.id}>
             <time>{new Date(event.timestamp).toLocaleTimeString()}</time>
             <span>{boldAthleteNames(event.message, athletes)}</span>
@@ -544,6 +545,7 @@ function MiniCell({ boulder, current, currentAttempt, small = false, inferredNoS
 
 function eventTypeClass(event: CompetitionEvent) {
   if (event.type === "RANK_CHANGED") {
+    if (event.reason === "lead-rank-after-fall") return "event-rank-up";
     const match = event.reason.match(/Rank\s+(\d+)\s*->\s*(?:Rank\s*)?(\d+)/i);
     const before = Number(match?.[1]);
     const after = Number(match?.[2]);
@@ -556,6 +558,14 @@ function eventTypeClass(event: CompetitionEvent) {
   if (event.type === "TOP_REACHED") return "event-top";
   if (event.type === "ZONE_REACHED") return "event-zone";
   return "event-default";
+}
+
+function isRankDownEvent(event: CompetitionEvent) {
+  if (event.type !== "RANK_CHANGED") return false;
+  const match = event.reason.match(/Rank\s+(\d+)\s*->\s*(?:Rank\s*)?(\d+)/i);
+  const before = Number(match?.[1]);
+  const after = Number(match?.[2]);
+  return Number.isFinite(before) && Number.isFinite(after) && after > before;
 }
 
 function isSlashedBoulder(boulder: MiniBoulder) {
