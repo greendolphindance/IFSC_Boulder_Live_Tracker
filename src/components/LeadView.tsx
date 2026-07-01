@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CompetitionState, LeadResult } from "../../server/src/types/domain";
 import { EventFeed } from "./LiveView";
+import { AthleteName } from "./AthleteName";
 
 export function LeadView({ state, mode }: { state: CompetitionState; mode: "columns" | "axis" }) {
   const lead = state.snapshot.lead;
@@ -56,7 +57,7 @@ function LeadColumns({ athletes, roundType, events, state }: { athletes: LeadRes
         <section className="lead-status-card lead-current-card">
           <div className="lead-card-title">Currently Climbing</div>
           {active ? <LeadFeatured athlete={active} /> : <div className="empty">No climber</div>}
-          <div className="lead-next">Next: {next ? compactName(next.athlete.name) : "-"}</div>
+          <div className="lead-next">Next: {next ? <AthleteName athlete={next.athlete}>{compactName(next.athlete.name)}</AthleteName> : "-"}</div>
         </section>
         <div className="lead-column-feed">
           <EventFeed events={events} athletes={state.snapshot.athletes} />
@@ -78,7 +79,7 @@ function LeadFeatured({ athlete }: { athlete: LeadResult }) {
   return (
     <div className="lead-featured">
       <div>
-        <div className="lead-athlete-name">{compactName(athlete.athlete.name)}</div>
+        <AthleteName athlete={athlete.athlete} className="lead-athlete-name">{compactName(athlete.athlete.name)}</AthleteName>
         <div className="lead-meta">Elapsed {formatElapsed(athlete.elapsedSeconds ?? 0)}</div>
       </div>
       <div className={`lead-score lead-score-${athlete.status}`}>{athlete.scoreText}</div>
@@ -95,7 +96,7 @@ function LeadRankingRow({ athlete, compact, underAppeal }: { athlete: LeadResult
   return (
     <div className={`lead-ranking-row lead-${athlete.status} ${underAppeal ? "under-appeal" : ""} ${compact ? "compact" : ""}`}>
       <strong>{athlete.status === "dns" ? "" : `#${athlete.rank}`}</strong>
-      <span>{compactName(athlete.athlete.name)}</span>
+      <span><AthleteName athlete={athlete.athlete}>{compactName(athlete.athlete.name)}</AthleteName></span>
       <small>{underAppeal ? "under appeal" : ""}</small>
       <b>{athlete.scoreText}</b>
     </div>

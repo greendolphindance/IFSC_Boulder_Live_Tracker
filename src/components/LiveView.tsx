@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { AthleteRoundResult, CompetitionEvent, CompetitionState } from "../../server/src/types/domain";
 import { athleteById } from "../lib/format";
+import { AthleteName } from "./AthleteName";
 
 interface Props {
   state: CompetitionState;
@@ -129,7 +130,9 @@ function RouteTile({ state, route, showNext }: { state: CompetitionState; route:
     <article className={`route-tile ${live ? "active-route" : ""}`}>
       <div className="route-header">
         <div className="route-id">{routeLabel(state, route.group, route.boulderNo)}</div>
-        <div className="athlete-name">{result ? displayName(result.athlete.name) : "Open"}</div>
+        {result
+          ? <AthleteName athlete={result.athlete} className="athlete-name">{displayName(result.athlete.name)}</AthleteName>
+          : <div className="athlete-name">Open</div>}
       </div>
       {result && live ? (
         <>
@@ -140,12 +143,12 @@ function RouteTile({ state, route, showNext }: { state: CompetitionState; route:
               <strong>{displayRankLabel(result)}</strong>
             </div>
           </div>
-          {showNext && <div className="next-line">Next: {next ? displayName(next.name) : "-"}</div>}
+          {showNext && <div className="next-line">Next: {next ? <AthleteName athlete={next}>{displayName(next.name)}</AthleteName> : "-"}</div>}
         </>
       ) : (
         <>
           <div className="empty-route">No climber</div>
-          {showNext && <div className="next-line">Next: {next ? displayName(next.name) : "-"}</div>}
+          {showNext && <div className="next-line">Next: {next ? <AthleteName athlete={next}>{displayName(next.name)}</AthleteName> : "-"}</div>}
         </>
       )}
     </article>
@@ -179,7 +182,9 @@ function RouteSummaryRow({ state, route }: { state: CompetitionState; route: Rou
   return (
     <div className={`ranking-row route-summary-row ${live ? "active-ranking" : ""}`}>
       <strong>{routeLabel(state, route.group, route.boulderNo)}</strong>
-      <span className="ranking-name">{result ? displayName(result.athlete.name) : "Open"}</span>
+      {result
+        ? <AthleteName athlete={result.athlete} className="ranking-name">{displayName(result.athlete.name)}</AthleteName>
+        : <span className="ranking-name">Open</span>}
       {result && live ? (
         <>
           <RankingBoulders boulders={result.boulders} currentBoulder={live.currentBoulder} currentAttempt={live.currentAttempt} roundFinished={isFinishedRound(state)} />
@@ -281,7 +286,7 @@ function RankingPanel({ state, boxed = false, splitGroups = false, compactWidth 
                 return (
                   <div className={`ranking-row ${boxed ? "ranking-card" : ""} ${active ? "active-ranking" : ""}`} key={result.athlete.id}>
                     <strong>{displayRankLabel(result)}</strong>
-                    <span className="ranking-name">{displayName(result.athlete.name)}</span>
+                    <AthleteName athlete={result.athlete} className="ranking-name">{displayName(result.athlete.name)}</AthleteName>
                     <RankingBoulders boulders={result.boulders} currentBoulder={live?.currentBoulder} currentAttempt={live?.currentAttempt} roundFinished={isFinishedRound(state)} />
                     <span className="ranking-score">{displayScore(result)}</span>
                   </div>

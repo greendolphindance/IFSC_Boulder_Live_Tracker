@@ -2723,3 +2723,64 @@ pre {
     background: #cfe4fb;
   }
 }
+
+/* ===== Clickable athlete name (.name-link) =====
+   Default state inherits the current name colour → zero visual change until hovered.
+   Underline drawn with text-decoration (transparent by default) so it adapts to text
+   width and never breaks the existing ellipsis truncation. */
+.name-link {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+  border-radius: 3px;
+  outline: none;
+}
+
+/* Featured big name (28px): thicker underline, kept inline-block so the hit area
+   hugs the text instead of spanning the row. */
+.lead-athlete-name.name-link {
+  display: inline-block;
+  max-width: 100%;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* Hover state only on devices with a real pointer → prevents the :hover colour from
+   "sticking" on touch screens after a tap. cursor:pointer lives here too. */
+@media (hover: hover) and (pointer: fine) {
+  .name-link {
+    cursor: pointer;
+  }
+
+  .theme-dark .name-link:hover {
+    color: #7fd7ff;
+    text-decoration-color: #7fd7ff;
+  }
+
+  .theme-light .name-link:hover {
+    color: #1c6fa0;
+    text-decoration-color: #1c6fa0;
+  }
+}
+
+/* Keyboard focus is independent of :hover, so it stays outside the hover guard. */
+.theme-dark .name-link:focus-visible {
+  color: #7fd7ff;
+  text-decoration-color: #7fd7ff;
+  box-shadow: 0 0 0 2px #070a0f, 0 0 0 4px #7fd7ff;
+}
+
+.theme-light .name-link:focus-visible {
+  color: #1c6fa0;
+  text-decoration-color: #1c6fa0;
+  box-shadow: 0 0 0 2px #f5f7fb, 0 0 0 4px #1c6fa0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .name-link {
+    transition: none;
+  }
+}
