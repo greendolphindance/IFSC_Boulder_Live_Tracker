@@ -1,0 +1,20 @@
+name: Contract Sentinel
+
+# 每天核查 ifsc.results.info 的 REST 结构是否悄悄改版。
+# FAIL 时依赖 GitHub 默认的 workflow 失败邮件通知，不接额外告警渠道。
+on:
+  schedule:
+    - cron: "0 6 * * *" # 每天 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  contract-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/contract-sentinel.ts
