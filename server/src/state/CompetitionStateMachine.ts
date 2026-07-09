@@ -11,9 +11,12 @@ import type {
   RankChange,
   UpNextEntry
 } from "../types/domain.js";
+import { deriveMedalChances } from "./medalChances.js";
 
 const CLIMBING_WINDOW_SECONDS = 4 * 60;
 const MAX_BOULDERS = 5;
+/** DIFF-009 隔离开关（默认 false）：难度赛"依赖登顶判定"的条件待 DIFF-009 修好后翻此开关即生效（本包零改动 · TC-MEDAL-013/014）。 */
+const DIFF009_FIXED = process.env.DIFF009_FIXED === "true";
 
 export class CompetitionStateMachine {
   private previous?: CompetitionSnapshot;
@@ -48,6 +51,7 @@ export class CompetitionStateMachine {
     const upNext = this.deriveUpNext(snapshot, currentClimbers);
     this.previous = snapshot;
 
+    const connectionStatus: CompetitionState["connection"]["status"] = "connected";
     return {
       snapshot,
       liveStates,
@@ -57,7 +61,7 @@ export class CompetitionStateMachine {
       rankChanges: this.rankChanges,
       connection: {
         source,
-        status: "connected",
+        status: connectionStatus,
         lastUpdate: snapshot.receivedAt
       },
       debug: {
@@ -68,7 +72,9 @@ export class CompetitionStateMachine {
           "Current climber is derived from source changes when no explicit live field exists.",
           "Fixture source is active until IFSC Network contract is captured."
         ]
-      }
+      },
+      // 决赛轮奖牌条件派生（CHG-001）· 纯快照函数（不读 this.previous）· 失败自置 undefined、不拖垮 state。
+      medalChances: deriveMedalChances(snapshot, connectionStatus, DIFF009_FIXED)
     };
   }
 
