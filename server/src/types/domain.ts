@@ -174,9 +174,11 @@ export type MedalVerdict = "locked" | "eliminated" | "undecided" | "needs_condit
 
 export interface MedalCondition {
   /**
-   * 一句话可读组合（英文）。needs_conditions 一律含 "at best" 措辞（乐观上界提示）。
-   * ⚠️ 同分 countback 临界时必须显式含 countback 要素、禁只给分数阈值
-   * （占优/吃亏用两段式，degraded 概括用短式保留要素 · 见 03-PRD片段 §4.3.c）。
+   * 一句话可读组合（英文）。needs_conditions 用"剩余还需分"下限口径
+   * （"Needs at least X …"；PM 灰度决定1 已撤旧 "at best" 上界措辞）。
+   * ⚠️ 同分 countback 临界时必须显式含 countback 要素、禁只给分数阈值：
+   * 方向按 IFSC 官方半决赛排名（startOrder，大者胜）——占优打平即可 / 吃亏须超过；
+   * ≥3 对手（含 countback 从句对手）概括时保留失手方向（见 03-PRD片段 §4.3.c · CONTRACT-DRIFT-1）。
    */
   summary: string;
   /** 条件级可信度 · 仅难度赛依赖登顶的那条置此（依赖 DIFF-009）。 */
