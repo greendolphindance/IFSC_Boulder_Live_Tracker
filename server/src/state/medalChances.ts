@@ -36,14 +36,21 @@ const EPS = 1e-6;
  * 已结束轮次必须把全员 best/worst 区间收敛为当前实得分：比赛结束后不存在"还能改善"，
  * 否则会对已定名次误产 needs_conditions（真实案例：Meishan 女子决赛 Melody 银牌 · ROUND-3）。
  */
-const ROUND_FINISHED_RE = /finished|complete|closed|archived|ended/;
-/** 轮次未开始词表 · 对齐 CompetitionStateMachine.roundStatusKind 的 not-started 分支。 */
-const ROUND_NOT_STARTED_RE = /not started|not_started|upcoming|scheduled|pending/;
+// 必修3：三个状态判定统一用【精确白名单集合 · 全等比较】，不用无边界 test()——
+//   旧无边界子串匹配会把 "unfinished"/"not finished"/"incomplete"/"suspended"(含 ended) 误判成已结束（最高危：
+//   一击收敛全场区间、比赛中途误产 locked/eliminated），"rescheduled"(含 scheduled)/"pending review"(含 pending)
+//   误判未开始，"unlocked"/"not confirmed" 误判成绩已定。全等比较把这些否定/前缀词干净排除。
+const FINISHED_STATUSES = new Set(["finished", "complete", "completed", "closed", "archived", "ended"]);
+const NOT_STARTED_STATUSES = new Set(["not started", "not_started", "upcoming", "scheduled", "pending"]);
+/** 归一化：去首尾空白 + 小写 + 内部连续空白折叠为单空格（下划线保留原样，匹配 "not_started" 这类原始 token）。 */
+function normalizeStatus(raw: unknown): string {
+  return String(raw ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
 /** 未开始态统一理由（四态口径 · 03-PRD §4.4 empty 之②"比赛刚开始"）。 */
 const NOT_STARTED_REASON = "The final has not started yet — nothing can be decided until climbing begins.";
 
 function isRoundFinished(snapshot: CompetitionSnapshot): boolean {
-  return ROUND_FINISHED_RE.test(String(snapshot.roundStatus ?? "").toLowerCase());
+  return FINISHED_STATUSES.has(normalizeStatus(snapshot.roundStatus));
 }
 
 /**
@@ -54,7 +61,7 @@ function isRoundFinished(snapshot: CompetitionSnapshot): boolean {
  * 且无人已上场（难度赛全员 waiting）。"无进展"优先于结束态兜底 finished+零攀爬的退化情形。
  */
 function isRoundNotStarted(snapshot: CompetitionSnapshot): boolean {
-  if (ROUND_NOT_STARTED_RE.test(String(snapshot.roundStatus ?? "").toLowerCase())) return true;
+  if (NOT_STARTED_STATUSES.has(normalizeStatus(snapshot.roundStatus))) return true;
   const boulderStarted = snapshot.athletes.some((result) => result.boulders.some(hasBoulderProgress));
   const leadStarted = (snapshot.lead?.genders ?? []).some((group) => group.athletes.some((athlete) => athlete.status !== "waiting"));
   return !boulderStarted && !leadStarted;
@@ -141,6 +148,9 @@ interface Projection {
   best: number;
   /** 还能改善的线路数（best>worst 的线数）· 0 = 已完赛。 */
   liveRoutes: number;
+  /** 单条 live 线时（liveRoutes===1）那条线当前已入账的 worst 贡献（已到区=zoneScore，未到区=0）。
+   *  必修4/7：把数框架按【绝对末线目标分 = x + lastLineFloor】换算，不减已得 zone 分。 */
+  lastLineFloor: number;
   /** 决赛出场顺序 = 半决赛排名逆序（startOrder 大 = 半决赛好 = 同分占优）· 官方破平主判据。 */
   startOrder: number;
 }
@@ -186,6 +196,7 @@ function boulderProjection(
   let best = 0;
   let worst = 0;
   let liveRoutes = 0;
+  let lastLineFloor = 0; // 最近一条 live 线的 worst 贡献（liveRoutes===1 时即那条唯一末线的 floor）
   for (let boulderNo = 1; boulderNo <= totalRoutes; boulderNo += 1) {
     const boulder = byBoulder.get(boulderNo);
     if (boulder?.hasTop) {
@@ -208,11 +219,17 @@ function boulderProjection(
       best += topFromZone(boulder.attemptsToZone);
       worst += zoneScore(boulder.attemptsToZone);
       liveRoutes += 1;
+      lastLineFloor = zoneScore(boulder.attemptsToZone); // 该 live 线已入账到区分
     } else {
       // 当前线未到区 / 未来线（全空）：best 假设 flash 登顶(25)，worst 假设 0。
+      // TODO(KNOWN-ISSUE · ROUND-10 · PM 决定暂不修)：当前【正在爬】的线若已出手几次仍未到区，
+      //   现实最好可达只是 topScore(已出手数+1) < 25，但此处一律按 flash(25) → best 偏高、可能漏判 eliminated。
+      //   数据可拿"进行中已出手数"(attemptsToTop/attemptsToZone 或 rawStatus="A{n}")，但需真实进行中比赛数据验证，
+      //   当前无比赛。待有进行中真实数据后按已出手数收敛 best。详见 08-修复历史 [TODO/KNOWN-ISSUE-1]。
       best += 25;
       worst += 0;
       liveRoutes += 1;
+      lastLineFloor = 0; // 该 live 线未到区，无入账
     }
   }
   return {
@@ -222,13 +239,17 @@ function boulderProjection(
     worst: round1(worst),
     best: round1(best),
     liveRoutes,
+    lastLineFloor: round1(lastLineFloor),
     startOrder: result.athlete.startOrder
   };
 }
 
+/** 单条抱石线"成绩已定"状态词（精确集合 · 必修3）。"locked" 已实测确认为上游成绩已锁定标记
+ *  （evidence/upstream-ascent-status-probe.md · 与本模块 MedalVerdict "locked" 无关）；timeout/time expired 为防御性保留。 */
+const SETTLED_NOTOP_STATUSES = new Set(["confirmed", "locked", "expired", "no score", "timeout", "time expired"]);
 function isSettledNoTop(boulder: BoulderResult): boolean {
-  // "locked" = 上游 IFSC ascent 的"成绩已定"标记（真实源实测 · 与本模块 MedalVerdict "locked" 无关）
-  return /confirmed|locked|expired|no score|timeout|time expired/i.test(boulder.rawStatus ?? "");
+  // 全等比较：不会把 "unlocked"/"not confirmed"/"unconfirmed" 误判成已定（旧无边界 test 会）。
+  return SETTLED_NOTOP_STATUSES.has(normalizeStatus(boulder.rawStatus));
 }
 
 // —— 抱石计分权重（term-lock：Top 25 / Zone 10 · 每多一手 −0.1；与 scoreBoulders 同款，不另设魔法数）——
@@ -238,9 +259,15 @@ function topScore(attemptsToTop?: number): number {
 function zoneScore(attemptsToZone?: number): number {
   return 10 - 0.1 * Math.max(0, (attemptsToZone ?? 1) - 1);
 }
-/** 当前线已到区、再加一手登顶可达分（attemptsToTop = attemptsToZone + 1）· TC-MEDAL-010：zone 用 1 手 → 24.9。 */
+/**
+ * 当前线已到区、仍在墙上时的【最好可达】分（best 上界口径）· 必修6。
+ * IFSC 同一把可从到区直接登顶（flash：zone=1,top=1），故最好可达 = `topScore(attemptsToZone)`
+ * （attemptsToTop = attemptsToZone），而非旧口径假设"登顶必比到区多一把"的 `25−0.1·z`（少 0.1）。
+ * 少算 0.1 会在同分临界翻转（误判 eliminated）。数据无法区分"到区后已脱落 / 仍在墙上"，按规格
+ * best=乐观上界一律取本把登顶（TC-MEDAL-010 随此从 24.9 修正为 25：到区 1 手的乐观上界=flash top）。
+ */
 function topFromZone(attemptsToZone?: number): number {
-  return 25 - 0.1 * Math.max(0, (attemptsToZone ?? 0));
+  return topScore(attemptsToZone);
 }
 
 // —— 抱石单奖牌项判定 ——
@@ -308,13 +335,16 @@ function buildNeedsConditions(
   const add = (summary: string) => { if (summary && !seen.has(summary)) { seen.add(summary); combos.push({ summary }); } };
 
   if (done) {
-    // d 类：自己已爬完，无自身动作。她保住第 targetRank 名，除非 > allow 名能反超者(best>banked)反超。
-    const overtakers = ranked.filter((o) => o.best - banked > EPS);
-    if (overtakers.length === 0) {
+    // d 类：自己已爬完（best=worst=banked），无自身动作。
+    // 必修1：overtakers = 仍能反超她 banked 的【全部】摆动对手，判定用 beats（含"同分且对手半决赛占优"的反超者，
+    //   非 o.best−banked>EPS——后者漏了打平靠 countback 反超的对手）。
+    const overtakers = ranked.filter((o) => beats(o.best, o.startOrder, banked, subject.startOrder));
+    if (overtakers.length <= allow) {
       add(`Takes ${medalWord(medal)} — the remaining climbers can no longer catch her.`);
     } else {
-      // 命名"再多 1 名反超即丢牌"的关键对手（第 allow+1 名及其同档）。
-      add(dependsOnlyCombo(medal, subject, overtakers.slice(0, allow + 1), "Takes"));
+      // 必修1：列出全部 overtakers；allow=0 → 任一反超即丢牌（"unless any … catches"）；
+      //   allow≥1 → 计数阈值（"unless at least allow+1 of … catch her"），不指定是谁。
+      add(dependsOnlyCombo(medal, subject, overtakers, "Takes", allow));
     }
     return { medal, verdict: "needs_conditions", reason, conditions: combos };
   }
@@ -343,17 +373,18 @@ function buildNeedsConditions(
     const certainly = threats.filter((o) => beats(o.worst, o.startOrder, target, subject.startOrder));
     if (certainly.length > allow) continue; // 铁定在前者已超过允许数 → 该分数拿不到该名次 = 不可行，跳过（绝不写"让已定选手失手"的假条件）
     const removable = threats.filter((o) => !certainly.includes(o)); // 可能反超但仍能被劝退（还在爬）的威胁
-    const holdOff = removable.slice(Math.max(0, allow - certainly.length)); // 允许名额先扣给铁定者，其余可劝退威胁必须全部失手
+    const freeSlots = allow - certainly.length; // 铁定者占掉名额后，removable 里还能放行几名（≥0，certainly≤allow 已校验）
     lastX = x;
     const cb: CountbackNote | undefined = canTie && bar
       ? { kind: tieWin ? "win" : "lose", opponent: bar.firstName, subject: subject.firstName }
       : undefined;
     if (x <= EPS) {
-      // 防守级（自身无需再拿分）：能守住(certainly ≤ allow 已在上面校验)，纯靠这些还能反超者别追上。
-      if (holdOff.length > 0) add(dependsOnlyCombo(medal, subject, holdOff, "Holds"));
+      // 防守级（自身无需再拿分）：她只在【超过 freeSlots 名】removable 追上时丢牌（必修5 计数约束，不指定是谁）。
+      if (removable.length > freeSlots) add(dependsOnlyCombo(medal, subject, removable, "Holds", freeSlots));
       continue;
     }
-    add(holdOff.length === 0 ? selfCombo(subject, x, routesLeft, cb) : helpCombo(subject, x, holdOff, routesLeft, cb));
+    // removable ≤ freeSlots → 全部可放行 = 纯靠自己；否则带"计数约束"对手从句（必修5）。
+    add(removable.length <= freeSlots ? selfCombo(subject, x, routesLeft, cb) : helpCombo(subject, x, removable, freeSlots, routesLeft, cb));
   }
   if (combos.length === 0) {
     // 理论兜底：压过第 allow 名（若存在）纯靠自己。
@@ -380,43 +411,74 @@ function countbackPhrase(cb: CountbackNote): string {
     : ` — even matching ${cb.opponent}'s score isn't enough, ${cb.opponent} takes it on semi-final ranking`;
 }
 
-// —— 末线"第几把内登顶"精确临界（PM 灰度：top 分随出手数变化，非单一值）——
-//   第 att 把登顶 = 25 − 0.1×(att−1)：flash=25、2 把=24.9、3 把=24.8…；zone 上限=10。
-//   末线登顶现实把数上限：决赛一条线多在数把内登顶，超过即视作"任何现实登顶都够"，把数不再是有效约束
-//   → 退回分数（自身）/ 笼统 "tops"（对手）。
-const MAX_TOP_ATTEMPTS = 8;
-/** 达到末线分数线 lc 所需"第几把内登顶"——仅当 lc 必须靠登顶(>zone 上限 10)且把数在现实范围(≤MAX)才返回；否则 null。 */
-function topAttemptsFor(lc: number): number | null {
-  if (lc <= 10 + EPS || lc > 25 + EPS) return null; // ≤zone 可达（非登顶阈值）/ >flash 不可达 → 不用把数
-  const n = 1 + Math.floor((25 - lc) / 0.1 + EPS);
-  return n >= 1 && n <= MAX_TOP_ATTEMPTS ? n : null;
+// ══ 末线单条时的【所需把数】三档文案（必修4）· 以该线【绝对目标分 L】为准（不减已得 zone 分 · 必修7）══
+//   L>10 → top 侧（须登顶）；L≤10 → zone 侧（到区即可）。第 N 把：top=25−0.1(N−1)、zone=10−0.1(N−1)。
+//   档1 ≤9 把（把数直观）· 档2 10~20 把（说分数）· 档3 ≥21 把（只说要 top/zone）。
+const TIER1_MAX_ATTEMPTS = 9;   // ≤9 把 → 档1
+const TIER2_MAX_ATTEMPTS = 20;  // 10~20 把 → 档2；≥21 把 → 档3
+/** 绝对末线目标分 L → 侧别 + 第几把 + 档位。 */
+function lineTier(L: number): { side: "top" | "zone"; n: number; tier: 1 | 2 | 3 } {
+  const top = L > 10 + EPS;
+  const base = top ? 25 : 10;
+  const n = Math.max(1, 1 + Math.round((base - L) / 0.1)); // 第 n 把达到 L
+  const tier = n <= TIER1_MAX_ATTEMPTS ? 1 : n <= TIER2_MAX_ATTEMPTS ? 2 : 3;
+  return { side: top ? "top" : "zone", n, tier };
 }
-/** 对手末线达到某分数线才反超 → 若只剩末线一条 + 必须登顶且把数有效，返回精确"第几把内"；否则 null。 */
-function opponentTopAttempts(subject: Projection, opponent: Projection, subjectLine: number): number | null {
-  if (opponent.liveRoutes !== 1) return null; // 变量不止末线一条（多条未爬）→ 把数框架不适用
+/** 自身末线三档句（top/zone 侧）。中间档说绝对分 L；flash 区分 boulder（登顶）/ zone（到区）。 */
+function selfLinePhrase(L: number): string {
+  const { side, n, tier } = lineTier(L);
+  if (tier === 1) {
+    if (side === "top") return n === 1 ? "Flashes the boulder" : `Tops her last boulder in ${n} attempts or fewer`;
+    return n === 1 ? "Flashes the zone" : `Zones her last boulder in ${n} attempts or fewer`;
+  }
+  if (tier === 2) return `Needs ${formatScore(L)} points on her last boulder`;
+  return side === "top" ? "Needs to top her last boulder" : "Needs to zone her last boulder";
+}
+/** 对手末线绝对目标分 L（反超 subject 所需）——仅对手只剩末线一条才用把数框架，否则 null。 */
+function opponentLineTarget(subject: Projection, opponent: Projection, subjectLine: number): number | null {
+  if (opponent.liveRoutes !== 1) return null; // 变量不止末线一条 → 把数框架不适用
   const oppWinsTie = compareSemifinalRank(opponent.startOrder, subject.startOrder) > 0;
-  const lc = round1(subjectLine - opponent.worst + (oppWinsTie ? 0 : 0.1)); // 反超 subjectLine 所需末线分（含同分方向）
-  return topAttemptsFor(lc);
+  const oppBankedOther = round1(opponent.worst - opponent.lastLineFloor); // 对手除末线外已得（必修7：加回末线 floor 才是绝对线分）
+  const L = round1(subjectLine - oppBankedOther + (oppWinsTie ? 0 : 0.1)); // 对手末线须达到的绝对分（含同分方向）
+  return L;
+}
+/** 对手"别达到 L"三档句（不反超）。中间档退回"does not out-score her"。 */
+function opponentLinePhrase(firstName: string, L: number): string {
+  const { side, n, tier } = lineTier(L);
+  if (tier === 1) {
+    if (side === "top") return n === 1 ? `${firstName} does not flash the boulder` : `${firstName} does not top her last boulder in ${n} attempts or fewer`;
+    return n === 1 ? `${firstName} does not flash the zone` : `${firstName} does not zone her last boulder in ${n} attempts or fewer`;
+  }
+  if (tier === 2) return `${firstName} does not out-score her`;
+  return side === "top" ? `${firstName} does not top her last boulder` : `${firstName} does not zone her last boulder`;
+}
+/** 对手"达到 L 即反超"三档句（d 类）。 */
+function opponentOvertakePhrase(firstName: string, L: number): string {
+  const { side, n, tier } = lineTier(L);
+  if (tier === 1) {
+    if (side === "top") return n === 1 ? `${firstName} flashes the boulder` : `${firstName} tops her last boulder in ${n} attempts or fewer`;
+    return n === 1 ? `${firstName} flashes the zone` : `${firstName} zones her last boulder in ${n} attempts or fewer`;
+  }
+  if (tier === 2) return `${firstName} out-scores her`;
+  return side === "top" ? `${firstName} tops her last boulder` : `${firstName} zones her last boulder`;
 }
 
-/** 自身达线句主体（末线登顶→"第几把内"；否则下限 X 分 / 多线两句式）+ 触发时的方向 countback 说明。 */
-function selfMilestone(x: number, routesLeft: number, cb?: CountbackNote): string {
-  const n = routesLeft === 1 ? topAttemptsFor(x) : null;
+/** 自身达线句主体（末线单条→三档制以绝对目标分为准；多线→跨线还需 X 分）+ 触发时的方向 countback 说明。 */
+function selfMilestone(subject: Projection, x: number, cb?: CountbackNote): string {
+  const routesLeft = subject.liveRoutes;
   let need: string;
-  if (n !== null) {
-    // 末线必须登顶且把数是有效约束 → 用"第几把内登顶"表达（比分数直观 · PM 灰度点 3）。
-    need = n === 1 ? "Flashes her last boulder" : `Tops her last boulder in ${n} attempts or fewer`;
+  if (routesLeft === 1) {
+    const L = round1(x + subject.lastLineFloor); // 绝对末线目标分（不减已得 zone 分 · 必修4/7）
+    need = selfLinePhrase(L);
   } else {
-    need = routesLeft === 1
-      ? `Needs at least ${formatScore(x)} on the last boulder`
-      : `Needs at least ${formatScore(x)} more across the remaining ${routesLeft} boulders`;
+    need = `Needs at least ${formatScore(x)} more across the remaining ${routesLeft} boulders`;
   }
   return cb ? `${need}${countbackPhrase(cb)}` : need;
 }
 
 /** a 类：纯靠自己。 */
 function selfCombo(subject: Projection, x: number, routesLeft: number, cb?: CountbackNote): string {
-  return `${selfMilestone(x, routesLeft, cb)}.`;
+  return `${selfMilestone(subject, x, cb)}.`;
 }
 
 /**
@@ -424,30 +486,40 @@ function selfCombo(subject: Projection, x: number, routesLeft: number, cb?: Coun
  * PM 灰度决定 3：单条组合内对手从句 ≥3 → 概括为 "needs [A], [B] and [C] to all fall short."
  * （保留"全都失手"逻辑方向，不用暧昧的 "depends on the performance of …"）。
  */
-function helpCombo(subject: Projection, x: number, holdOff: Projection[], routesLeft: number, cb?: CountbackNote): string {
-  const need = selfMilestone(x, routesLeft, cb);
-  // 决定 3 + 问题二修复：对手计数含 countback 从句涉及的对手（cb 里的 bar 也算一名）。
-  //   合计（holdOff + cb）≥3 → 把"需失手"从句概括为 "needs [A], [B] … to (all) fall short"（保留失手方向）。
-  const mentioned = holdOff.length + (cb ? 1 : 0);
+function helpCombo(subject: Projection, x: number, removable: Projection[], freeSlots: number, routesLeft: number, cb?: CountbackNote): string {
+  const need = selfMilestone(subject, x, cb);
+  const mustFall = removable.length - freeSlots; // 至少需失手的人数（>0，否则不会进 helpCombo）
+  if (freeSlots >= 1) {
+    // 必修5：allow 尚有余额 → 计数约束，"至多 freeSlots 名反超"= "至少 mustFall 名失手"，不指定是谁
+    //   （旧写法指定"次强及以下失手"是假条件：实际反超的换成别人、只要 ≤freeSlots 名，她仍拿牌）。
+    return `${need}, and needs at least ${mustFall} of ${nameList(removable)} to fall short.`;
+  }
+  // freeSlots=0：全部 removable 必须失手。对手计数含 countback 从句对手（cb 的 bar）→ 合计 ≥3 概括（问题二）。
+  const mentioned = removable.length + (cb ? 1 : 0);
   if (mentioned >= 3) {
-    const tail = holdOff.length >= 3 ? "to all fall short" : "to fall short";
-    return `${need}, and needs ${nameList(holdOff)} ${tail}.`;
+    const tail = removable.length >= 3 ? "to all fall short" : "to fall short";
+    return `${need}, and needs ${nameList(removable)} ${tail}.`;
   }
   const subjectLine = round1(subject.worst + x); // 该组合下 subject 的达线总分（对手须落在其下）
-  return `${need}, and ${holdOff.map((o) => holdClause(subject, o, subjectLine)).join(", and ")}.`;
+  return `${need}, and ${removable.map((o) => holdClause(subject, o, subjectLine)).join(", and ")}.`;
 }
 
 /**
  * d 类：无自身达线部分，纯看对手不反超（done → "Takes"；还在爬但已达线 → "Holds"）。
  * 决定 3：≥3 反超者 → 概括为 "unless any of [A], [B] and [C] catches her."（方向=他们反超）。
  */
-function dependsOnlyCombo(medal: MedalKind, subject: Projection, holdOff: Projection[], verb: "Takes" | "Holds"): string {
-  if (holdOff.length >= 3) {
-    return `${verb} ${medalWord(medal)} unless any of ${nameList(holdOff)} catches her.`;
-  }
+function dependsOnlyCombo(medal: MedalKind, subject: Projection, threats: Projection[], verb: "Takes" | "Holds", allowCount: number): string {
   // done(worst=best=最终分) 与防守级(x=0，停在 banked) 下 subject 最终分均 = subject.worst。
   const subjectLine = subject.worst;
-  return `${verb} ${medalWord(medal)} unless ${holdOff.map((o) => overtakeClause(subject, o, subjectLine)).join(" or ")}.`;
+  if (allowCount >= 1) {
+    // 必修1/5：她还能容许 allowCount 名反超 → 只有【至少 allowCount+1 名】反超才丢牌（计数约束，不指定是谁）。
+    return `${verb} ${medalWord(medal)} unless at least ${allowCount + 1} of ${nameList(threats)} catch her.`;
+  }
+  // allowCount=0：任一反超即丢牌。
+  if (threats.length >= 3) {
+    return `${verb} ${medalWord(medal)} unless any of ${nameList(threats)} catches her.`;
+  }
+  return `${verb} ${medalWord(medal)} unless ${threats.map((o) => overtakeClause(subject, o, subjectLine)).join(" or ")}.`;
 }
 
 /**
@@ -458,26 +530,25 @@ function dependsOnlyCombo(medal: MedalKind, subject: Projection, holdOff: Projec
  *   （不区分方向会把"对手打平即夺牌"漏写成可打平 = 假条件，违反问题一铁律。）
  */
 function holdClause(subject: Projection, opponent: Projection, subjectLine: number): string {
-  const n = opponentTopAttempts(subject, opponent, subjectLine);
-  if (n !== null) return n === 1 ? `${opponent.firstName} does not flash her last boulder` : `${opponent.firstName} does not top her last boulder in ${n} attempts or fewer`;
-  if (opponent.best - subject.best > EPS) return `${opponent.firstName} does not top her last boulder`;
+  const L = opponentLineTarget(subject, opponent, subjectLine);
+  if (L !== null && L > EPS && L <= 25 + EPS) return opponentLinePhrase(opponent.firstName, L); // 必修4/7：三档制 · 绝对末线分
+  // 兜底（多线 / 不可达）：按同分方向——对手半决赛占优则打平即反超 → 须严格落后。
   return compareSemifinalRank(opponent.startOrder, subject.startOrder) > 0
     ? `${opponent.firstName} finishes below her`
     : `${opponent.firstName} does not out-score her`;
 }
 
-/** d 类反向从句：对手"反超"才让 subject 丢牌（精确把数优先 · 同分方向同 holdClause）。 */
+/** d 类反向从句：对手"反超"才让 subject 丢牌（三档制 · 同分方向同 holdClause）。 */
 function overtakeClause(subject: Projection, opponent: Projection, subjectLine: number): string {
-  const n = opponentTopAttempts(subject, opponent, subjectLine);
-  if (n !== null) return n === 1 ? `${opponent.firstName} flashes her last boulder` : `${opponent.firstName} tops her last boulder in ${n} attempts or fewer`;
-  if (opponent.best - subject.best > EPS) return `${opponent.firstName} tops her last boulder`;
+  const L = opponentLineTarget(subject, opponent, subjectLine);
+  if (L !== null && L > EPS && L <= 25 + EPS) return opponentOvertakePhrase(opponent.firstName, L);
   return compareSemifinalRank(opponent.startOrder, subject.startOrder) > 0
     ? `${opponent.firstName} catches her`
     : `${opponent.firstName} out-scores her`;
 }
 
-/** first-name 列表："A"、"A and B"、"A, B and C"。 */
-function nameList(opponents: Projection[]): string {
+/** first-name 列表："A"、"A and B"、"A, B and C"（抱石/难度赛投影通用）。 */
+function nameList(opponents: { firstName: string }[]): string {
   const names = opponents.map((o) => o.firstName);
   if (names.length <= 1) return names.join("");
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
@@ -574,9 +645,21 @@ function leadOutcome(
     return { medal, verdict: "undecided", reason: "Too many contenders in play — check back soon.", conditions: [] };
   }
 
+  // 必修2b：subject 已爬完（settled → !live，无自身动作）→ 纯靠对手条文（类比抱石 done 分支）。
+  //   她掉不掉名次只取决于还没爬的 swing 对手是否反超，不应显示"Score at least X"自身动作。
+  if (!subject.live) {
+    const allowLead = Math.max(0, targetRank - 1 - sureAhead.length);
+    const summary = swing.length <= allowLead
+      ? `Takes ${medalWord(medal)} — the remaining climbers can no longer catch her.`
+      : leadDependsOnly(medal, subject, swing, allowLead, routeTop);
+    return { medal, verdict: "needs_conditions", reason: needsReasonLead(medal), conditions: [{ summary }] };
+  }
+
   // 目标分数线 X = 压过当前第 targetRank 名所需 leadScore（只看自身数值分，不依赖他人登顶 · TC-MEDAL-012）。
   // 决定 4：难度赛口径保持"总分"（Score at least X · 不换剩余分）· 去字面 "at best"。
-  const blocker = [...opponents].sort((a, b) => b.worst - a.worst)[targetRank - 1]; // 名次线上的 binding 对手
+  // 必修2a：binding 对手按【best 上界】排（与抱石一致）——按 worst 排会让"逆序出场、尚未爬(worst=0)的高种子"
+  //   沉到末位，阈值塌成 subject 自己的分、无视还没爬却能登顶反超的高种子。
+  const blocker = [...opponents].sort((a, b) => b.best - a.best)[targetRank - 1]; // 名次线上的 binding 对手
   const threshold = leadThreshold(subject, opponents, targetRank);
   const conditions: MedalCondition[] = [];
   if (threshold !== undefined) {
@@ -616,13 +699,31 @@ function leadOutcome(
   return { medal, verdict: "needs_conditions", reason: needsReasonLead(medal), conditions };
 }
 
-/** subject 要挤进第 targetRank 名，需超过当前第 targetRank 名对手的保底分。 */
+/** subject 要挤进第 targetRank 名，需超过名次线上对手的【上界(best)】· 必修2a（与抱石 bar.best 口径一致）。 */
 function leadThreshold(subject: LeadProjection, opponents: LeadProjection[], targetRank: number): number | undefined {
-  const ahead = [...opponents].sort((a, b) => b.worst - a.worst);
-  const blocker = ahead[targetRank - 1]; // 第 targetRank 名位置的对手（0-indexed）
+  const ahead = [...opponents].sort((a, b) => b.best - a.best);
+  const blocker = ahead[targetRank - 1]; // 第 targetRank 名位置的对手（按 best 上界 · 0-indexed）
   if (!blocker) return subject.worst; // 对手不足 → 现状即可
-  // 需比该对手保底分高一个最小步长（0.1）；若已够则维持现状。
-  return subject.best >= blocker.worst + EPS ? Math.max(subject.worst, blocker.worst + 0.1) : blocker.worst + 0.1;
+  // 需比该对手上界高一个最小步长（0.1）；若已够则维持现状。逆序未爬高种子 best=routeTop 会在此正确成为阈值。
+  return subject.best >= blocker.best + EPS ? Math.max(subject.worst, blocker.best + 0.1) : blocker.best + 0.1;
+}
+
+/** 难度赛"纯靠对手"条文（subject 已爬完 · 必修2b）：计数约束，不指定具体对手。 */
+function leadDependsOnly(medal: MedalKind, subject: LeadProjection, overtakers: LeadProjection[], allowCount: number, routeTop: number): string {
+  if (allowCount >= 1) {
+    return `Takes ${medalWord(medal)} unless at least ${allowCount + 1} of ${nameList(overtakers)} out-score her.`;
+  }
+  if (overtakers.length >= 3) {
+    return `Takes ${medalWord(medal)} unless any of ${nameList(overtakers)} catches her.`;
+  }
+  return `Takes ${medalWord(medal)} unless ${overtakers.map((o) => leadOvertakeClause(subject, o, routeTop)).join(" or ")}.`;
+}
+
+/** 单个对手反超已爬完 subject 的条件：需达 subject.worst(+0.1 若 subject 破平胜)；该分 ≥ 满分 → 须登顶。 */
+function leadOvertakeClause(subject: LeadProjection, opponent: LeadProjection, routeTop: number): string {
+  const oppWinsTie = compareSemifinalRank(opponent.startOrder, subject.startOrder) > 0;
+  const need = round1(subject.worst + (oppWinsTie ? 0 : 0.1)); // 对手反超所需最低分（含同分方向）
+  return need >= routeTop - EPS ? `${opponent.firstName} tops the final route` : `${opponent.firstName} out-scores her`;
 }
 
 // ============================================================================
