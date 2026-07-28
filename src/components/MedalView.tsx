@@ -70,6 +70,11 @@ export function MedalView({ state, error }: Props) {
               {item.label}
             </div>
           ))}
+          {/* Frame6-1：ranks ahead of 一次性定义（所有条件文案复用 · 消除"分数 vs 排名"歧义） */}
+          <div className="lg-item" title='"Ranks ahead of" = finishes higher in the final standings: a higher score, or the same score with the better semi-final ranking (countback).'>
+            <span className="lg-glyph">ℹ️</span>
+            "Ranks ahead of" = higher score, or same score with the better semi-final ranking (countback).
+          </div>
         </div>
       )}
 
