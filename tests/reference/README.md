@@ -1,12 +1,12 @@
 # 独立奖牌终局参考器
 
-版本：v1.0（2026-08-31）
+版本：v1.1（2026-08-31）
 
 ## 目的与边界
 
 本目录用有限、确定、可重复的合法终局世界独立核验公开函数 `deriveMedalChances`。参考器只导入公开函数和领域类型，不导入、不调用、不复制 `server/src/state/medalChances.ts` 或 `server/src/state/countback.ts` 的内部 helper，也不把正式算法的区间投影、剪枝、组合生成或文案生成当作 oracle。
 
-本目录只负责审计，不修生产实现。当前测试保留两个基线反例：Lead DNS 文案是等待后端修复的 gating failure；Boulder 进行中把数问题因缺少真实连续样本，以仍会执行断言的显式 `todo/KNOWN-ISSUE` 永久保留，不让默认入口因禁止猜修的问题长期红。
+本目录只负责审计，不修生产实现。当前测试保留两个回归案例：Lead DNS 文案反例已修复并在当前集成通过；Boulder 进行中把数问题因缺少真实连续样本，以仍会执行断言的显式 `todo/KNOWN-ISSUE` 永久保留，不让默认入口因禁止猜修的问题长期红。
 
 ## 与正式算法不同的路径
 
@@ -78,15 +78,15 @@ verdict 正确，英文原因却让 DNS 选手执行不可能的未来登顶。�
 node --experimental-transform-types --loader ./tests/reference/ts-loader.mjs --test --test-reporter=spec tests/reference/medalChances.logic.test.ts tests/reference/medalChances.copy.test.ts
 ```
 
-基线结果：53 项，51 通过，1 个 DNS gating failure，1 个已执行且仍失败的 Boulder `todo/KNOWN-ISSUE`。实验性 loader/transform warning 是 Node 运行时提示，不是测试失败。
+当前集成结果：53 项，52 通过，0 失败，1 个已执行且仍失败的 Boulder `todo/KNOWN-ISSUE`。Lead DNS golden 已通过；实验性 loader/transform warning 是 Node 运行时提示，不是测试失败。
 
-后端修复 DNS 文案前，可用下列控制命令只跳过当前 gating failure；Boulder todo 仍会执行并显示诊断：
+后端修复 DNS 文案前曾使用下列历史控制命令，只跳过当时的 DNS gating failure；Boulder todo 仍会执行并显示诊断：
 
 ```bash
 node --experimental-transform-types --loader ./tests/reference/ts-loader.mjs --test --test-reporter=spec --test-skip-pattern='COUNTEREXAMPLE' tests/reference/medalChances.logic.test.ts tests/reference/medalChances.copy.test.ts
 ```
 
-控制结果：52 项，51 通过，0 失败，1 个已执行且仍失败的 todo，退出码 0。
+当时的控制结果：52 项，51 通过，0 失败，1 个已执行且仍失败的 todo，退出码 0。
 
 集成前复核其他工作树中的生产修复时，可只读设置专用覆盖变量；loader 仅把公开 `medalChances.ts` 入口指向该根目录，其余 reference 代码仍来自审计产物：
 
@@ -118,3 +118,4 @@ IFSC_REFERENCE_PRODUCTION_ROOT=/absolute/path/to/target-worktree node --experime
 | 版本 | 日期 | 变更 |
 |---|---|---|
 | v1.0 | 2026-08-31 | 建立独立有限世界参考器、分层逻辑/英文测试、场景证据、两个永久反例与盲点说明。 |
+| v1.1 | 2026-08-31 | 更新 Lead DNS 修复后的当前集成状态，并保留修复前控制命令作为历史证据。 |
