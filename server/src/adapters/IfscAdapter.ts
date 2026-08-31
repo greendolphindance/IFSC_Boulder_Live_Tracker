@@ -786,7 +786,7 @@ function leadDataFromPayload(payload: IfscRoundPayload, athletes: CompetitionSna
   const categoryText = `${payload.category ?? ""}`.toLowerCase();
   const gender: LeadGender = categoryText.includes("men") && !categoryText.includes("women") ? "Men" : "Women";
   const leadAthletes = athletes
-    .sort((a, b) => a.rank - b.rank || b.score - a.score || a.athlete.startOrder - b.athlete.startOrder)
+    .sort((a, b) => a.rank - b.rank || b.score - a.score || b.athlete.startOrder - a.athlete.startOrder)
     .map((result) => {
       const parsedScore = parseLeadScore(result.leadScoreText ?? result.score);
       const hold = parsedScore.hold > 0 ? parsedScore.hold : leadHoldFromBoulders(result.boulders);

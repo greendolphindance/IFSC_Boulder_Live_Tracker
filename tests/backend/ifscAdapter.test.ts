@@ -93,6 +93,18 @@ test("same-rank and unranked Lead fallbacks are deterministic", () => {
   assert.deepEqual(snapshot.lead!.genders[0].athletes.map((entry) => entry.athlete.id), ["202", "201"]);
 });
 
+test("equal-rank equal-score Lead fallback gives the larger startOrder countback priority", () => {
+  const payload = twoAthleteLeadPayload("42", 999, 999);
+  payload.ranking[0].start_order = 7;
+  payload.ranking[1].score = "42";
+  payload.ranking[1].start_order = 8;
+  const snapshot = normalizeIfscPayload(
+    payload as Parameters<typeof normalizeIfscPayload>[0],
+    ENDPOINT
+  );
+  assert.deepEqual(snapshot.lead!.genders[0].athletes.map((entry) => entry.athlete.id), ["202", "201"]);
+});
+
 test("startlist-only athletes remain waiting and absent from official ranking", () => {
   const payload = boulderPayload(0);
   payload.ranking = [];

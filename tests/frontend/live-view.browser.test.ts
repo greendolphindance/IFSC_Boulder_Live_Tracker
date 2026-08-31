@@ -48,10 +48,16 @@ test("desktop and mobile DOM preserve Boulder and Lead score semantics", async (
       await page.reload({ waitUntil: "domcontentloaded" });
       await page.locator(".lead-ranking-list").waitFor();
       await assertLeadNotation(page, viewport.width, "columns");
+      const columnsCountbackOrder = await leadColumnsCountbackOrder(page);
 
       await page.getByRole("button", { name: "Axis" }).click();
       await page.locator(".lead-axis-point").first().waitFor();
       await assertLeadNotation(page, viewport.width, "axis");
+      const axisCountbackOrder = await leadAxisCountbackOrder(page);
+      assert.deepEqual({ columnsCountbackOrder, axisCountbackOrder }, {
+        columnsCountbackOrder: ["countback-8", "countback-7"],
+        axisCountbackOrder: ["C. Eight", "C. Seven"]
+      }, `${viewport.width}px Lead fallback countback must prefer the larger start order`);
       await context.close();
     }
   } finally {
@@ -84,6 +90,18 @@ async function assertLeadNotation(page: Page, width: number, view: string) {
     for (const notation of ["42+", "42", "TOP"]) assert(body.includes(notation), `${width}px ${view} ${notation}`);
   }
   assert.doesNotMatch(body, /42\.25|42\.3/, `${width}px ${view} must not expose the numeric comparison value`);
+}
+
+async function leadColumnsCountbackOrder(page: Page) {
+  const hrefs = await page.locator('.lead-ranking-row a[href*="/athlete/countback-"]').evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
+  return hrefs.map((href) => href.split("/").at(-1) ?? "");
+}
+
+async function leadAxisCountbackOrder(page: Page) {
+  const label = (await page.locator(".lead-axis-point b").filter({ hasText: "C. Seven" }).textContent()) ?? "";
+  const names = ["C. Seven", "C. Eight"];
+  for (const name of names) assert(label.includes(name), `Lead Axis countback label must include ${name}`);
+  return names.sort((a, b) => label.indexOf(a) - label.indexOf(b));
 }
 
 async function scoreIn(page: Page, container: string, athleteId: string) {
@@ -159,8 +177,10 @@ function leadState(): CompetitionState {
   const plus = leadResult("plus", "Plus Athlete", 1, 42, "42+", "climbing", true);
   const exact = leadResult("exact", "Exact Athlete", 2, 42, "42", "fall");
   const top = leadResult("top", "Top Athlete", 3, 100, "TOP", "top");
+  const countbackSeven = leadResult("countback-7", "Countback Seven", 999, 42, "42", "fall", false, 7);
+  const countbackEight = leadResult("countback-8", "Countback Eight", 999, 42, "42", "fall", false, 8);
   const dns = leadResult("lead-dns", "Lead DNS Athlete", 0, 0, "DNS", "dns");
-  const leadResults = [plus, exact, top, dns];
+  const leadResults = [plus, exact, top, countbackSeven, countbackEight, dns];
   return {
     snapshot: {
       sourceTimestamp: "2026-08-31T10:00:00.000Z",
@@ -188,8 +208,8 @@ function leadState(): CompetitionState {
   };
 }
 
-function leadResult(id: string, name: string, rank: number, hold: number, scoreText: string, status: LeadResult["status"], plus = false): LeadResult {
-  return { athlete: athlete(id, name, rank || 99), rank, hold, plus, scoreText, status, elapsedSeconds: status === "climbing" ? 90 : undefined };
+function leadResult(id: string, name: string, rank: number, hold: number, scoreText: string, status: LeadResult["status"], plus = false, startOrder = rank || 99): LeadResult {
+  return { athlete: athlete(id, name, startOrder), rank, hold, plus, scoreText, status, elapsedSeconds: status === "climbing" ? 90 : undefined };
 }
 
 function athlete(id: string, name: string, startOrder: number): Athlete {
