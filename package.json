@@ -8,6 +8,7 @@
     "dev:server": "tsx watch server/src/index.ts",
     "dev:client": "vite --host 0.0.0.0",
     "build": "npm run check && vite build",
+    "test": "tsx --test tests/backend/**/*.test.ts",
     "preview": "vite preview --host 0.0.0.0",
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json",
     "probe:ifsc": "tsx scripts/probe-ifsc.ts"

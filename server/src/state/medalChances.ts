@@ -759,6 +759,8 @@ interface LeadProjection {
   live: boolean;
   /** best 上界是否依赖"能登顶"（waiting/climbing 才有登顶可能）。 */
   canTop: boolean;
+  /** 保留终止语义，避免 DNS / 已掉落选手的文案描述不可能的未来动作。 */
+  status: LeadResult["status"];
   /** 决赛出场顺序 = 半决赛排名逆序（startOrder 大 = 半决赛好 = 同分占优）· 官方 §7.3 第一级破平。 */
   startOrder: number;
 }
@@ -801,6 +803,7 @@ function leadProjection(athlete: LeadResult, routeTop: number, roundFinished: bo
     best: round1(best),
     live,
     canTop: live,
+    status: athlete.status,
     startOrder: athlete.athlete.startOrder
   };
 }
@@ -846,7 +849,7 @@ function leadOutcome(
     return { medal, verdict: "locked", reason: lockedReasonLead(medal), conditions: [] };
   }
   if (bestRank > targetRank) {
-    return { medal, verdict: "eliminated", reason: eliminatedReasonLead(medal), conditions: [] };
+    return { medal, verdict: "eliminated", reason: eliminatedReasonLead(medal, subject), conditions: [] };
   }
 
   const swing = maybeAhead.filter((opponent) => !sureAhead.includes(opponent));
@@ -1072,7 +1075,13 @@ function needsReason(medal: MedalKind, subject: Projection): string {
 function lockedReasonLead(medal: MedalKind): string {
   return `Cannot drop below ${ordinal(medalRank(medal))} — ${medalWord(medal)} is secured.`;
 }
-function eliminatedReasonLead(medal: MedalKind): string {
+function eliminatedReasonLead(medal: MedalKind, subject: LeadProjection): string {
+  if (subject.status === "dns") {
+    return `She did not start, so ${medalWord(medal)} is out of contention.`;
+  }
+  if (!subject.live) {
+    return `Her final result cannot reach ${ordinal(medalRank(medal))} — ${medalWord(medal)} is out of contention.`;
+  }
   return `Even topping the route cannot reach ${ordinal(medalRank(medal))} — ${medalWord(medal)} is out of contention.`;
 }
 function needsReasonLead(medal: MedalKind): string {

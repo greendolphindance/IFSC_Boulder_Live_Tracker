@@ -727,6 +727,7 @@ export function normalizeIfscPayload(payload: IfscRoundPayload, endpoint: string
   const receivedAt = new Date().toISOString();
   const ranking = payload.ranking ?? [];
   const startlist = payload.startlist ?? [];
+  const discipline = disciplineFromPayload(payload);
   const startlistAthletes = new Map(startlist.map((entry) => [String(entry.athlete_id), toAthlete(entry, startOrderFromStartlist(entry))]));
   const rankingAthletes = ranking.map((entry) => toAthlete(entry, numberOrFallback(entry.start_order, startlistAthletes.get(String(entry.athlete_id))?.startOrder ?? 999)));
   const athleteIds = new Set([...ranking.map((entry) => String(entry.athlete_id)), ...startlist.map((entry) => String(entry.athlete_id))]);
@@ -735,7 +736,7 @@ export function normalizeIfscPayload(payload: IfscRoundPayload, endpoint: string
   const athletes = [...athleteIds].map((id) => {
     const ranking = rankingById.get(id);
     const athlete = ranking ? toAthlete(ranking, numberOrFallback(ranking.start_order, startlistAthletes.get(id)?.startOrder ?? 999)) : startlistAthletes.get(id)!;
-    const resultStatus = ranking ? rankingStatus(ranking) : undefined;
+    const resultStatus = ranking ? rankingStatus(ranking) : "waiting";
     const currentBoulder = ranking?.active ? activeBoulderFromAscents(ranking.ascents) : undefined;
     const boulders = ranking?.ascents?.map(toBoulderResult).sort((a, b) => a.boulderNo - b.boulderNo) ?? emptyBouldersFromStartlist(startlist.find((entry) => String(entry.athlete_id) === id));
     return {
@@ -744,8 +745,8 @@ export function normalizeIfscPayload(payload: IfscRoundPayload, endpoint: string
       groupRank: ranking?.group_rank === undefined || ranking?.group_rank === null ? undefined : numberOrFallback(ranking.group_rank, 999),
       startingGroup: ranking?.starting_group ?? undefined,
       currentBoulder,
-      score: leadScoreNumber(ranking?.lead_score_text ?? ranking?.score),
-      leadScoreText: ranking?.lead_score_text ?? (typeof ranking?.score === "string" ? ranking.score : undefined),
+      score: ranking ? canonicalScore(ranking, discipline) : 0,
+      leadScoreText: ranking && discipline === "lead" ? canonicalLeadScoreText(ranking.lead_score_text ?? ranking.score) : undefined,
       boulders: normalizeBoulderStatuses(boulders, resultStatus, currentBoulder),
       sourceStatus: ranking?.active ? "active" : ranking?.under_appeal ? "under_appeal" : resultStatus
     };
@@ -759,14 +760,14 @@ export function normalizeIfscPayload(payload: IfscRoundPayload, endpoint: string
     eventName: payload.event ?? "IFSC Boulder Competition",
     roundName: `${payload.category ?? "Category"} ${payload.round ?? "Round"}`,
     roundStatus: payload.status,
-    discipline: disciplineFromPayload(payload),
+    discipline,
     formatIdentifier: payload.format_identifier,
-    lead: disciplineFromPayload(payload) === "lead" ? leadDataFromPayload(payload, athletes) : undefined,
+    lead: discipline === "lead" ? leadDataFromPayload(payload, athletes) : undefined,
     athletes,
     ranking: ranking.map((entry) => ({
       athleteId: String(entry.athlete_id),
       rank: numberOrFallback(entry.rank, 999),
-      score: numberOrFallback(entry.score, 0)
+      score: canonicalScore(entry, discipline)
     })),
     startlist: buildStartlist(startlist, rankingAthletes),
     appeals: buildAppeals(ranking),
@@ -815,9 +816,15 @@ function leadScoreNumber(value: number | string | null | undefined) {
 }
 
 function parseLeadScore(value: number | string) {
-  const text = String(value);
+  const text = String(value).trim();
   if (/\bDNS\b|did not start/i.test(text)) return { hold: 0, plus: false, dns: true };
   if (/TOP/i.test(text)) return { hold: 100, plus: false, dns: false };
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) {
+    const hold = Math.floor(Math.max(0, numeric));
+    const plus = Math.abs(numeric - hold - 0.25) < 1e-6;
+    return { hold, plus, dns: false };
+  }
   const hold = Number(text.match(/\d+/)?.[0] ?? 0);
   return { hold: Number.isFinite(hold) ? hold : 0, plus: /\+/.test(text), dns: false };
 }
@@ -827,9 +834,28 @@ function leadScoreTextFromParsed(raw: string | undefined, hold: number, plus?: b
     if (/\bDNS\b/i.test(raw)) return "DNS";
     if (/TOP/i.test(raw)) return "TOP";
     const match = raw.match(/\d+\+?/);
-    if (match) return match[0];
+    if (match) return `${Math.floor(hold)}${plus ? "+" : ""}`;
   }
   return leadScoreText(hold, plus);
+}
+
+function canonicalScore(entry: IfscRankingEntry, discipline: "boulder" | "lead") {
+  return discipline === "lead"
+    ? leadScoreNumber(entry.lead_score_text ?? entry.score)
+    : boulderScoreNumber(entry.score);
+}
+
+function boulderScoreNumber(value: number | string | null | undefined) {
+  const parsed = typeof value === "number" ? value : Number(String(value ?? "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function canonicalLeadScoreText(value: number | string | null | undefined) {
+  const parsed = parseLeadScore(value ?? 0);
+  if (parsed.dns) return "DNS";
+  if (parsed.hold >= 100 || /TOP/i.test(String(value ?? ""))) return "TOP";
+  if (parsed.hold <= 0) return "-";
+  return leadScoreText(parsed.hold, parsed.plus);
 }
 
 function leadHoldFromBoulders(boulders: BoulderResult[]) {
