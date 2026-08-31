@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { AthleteRoundResult, CompetitionEvent, CompetitionState } from "../../server/src/types/domain";
-import { athleteById } from "../lib/format";
+import { athleteById, formatBoulderScore } from "../lib/format";
 import { AthleteName } from "./AthleteName";
 
 interface Props {
@@ -19,11 +19,14 @@ export function LiveView({ state, mode }: Props) {
   const routeColumnStyle = routeSyncedHeight ? { height: `${routeSyncedHeight}px` } : undefined;
   const summaryEvents = state.events
     .filter((event) => event.type !== "SNAPSHOT_RECEIVED");
+  const formatEventMessage = state.snapshot.discipline === "lead"
+    ? undefined
+    : (event: CompetitionEvent) => displayBoulderEventMessage(state, event);
 
   if (mode === "feed") {
     return (
       <main className="feed-layout">
-        <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} />
+        <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} formatMessage={formatEventMessage} />
       </main>
     );
   }
@@ -39,7 +42,7 @@ export function LiveView({ state, mode }: Props) {
         <aside className="side-column" style={athleteSyncedHeight ? { height: `${athleteSyncedHeight}px` } : undefined}>
           <RouteSummaryPanel state={state} />
           <div className="desktop-event-feed athlete-side-feed">
-            <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} />
+            <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} formatMessage={formatEventMessage} />
           </div>
         </aside>
       </main>
@@ -53,7 +56,7 @@ export function LiveView({ state, mode }: Props) {
           <RoutePanel state={state} />
         </div>
         <div className="desktop-event-feed route-feed">
-          <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} />
+          <EventFeed events={summaryEvents} athletes={state.snapshot.athletes} formatMessage={formatEventMessage} />
         </div>
       </section>
       <aside className="side-column" style={routeColumnStyle}>
@@ -139,7 +142,7 @@ function RouteTile({ state, route, showNext }: { state: CompetitionState; route:
           <div className="route-body">
             <MiniBoulders boulders={result.boulders} currentBoulder={live.currentBoulder} currentAttempt={live.currentAttempt} roundFinished={isFinishedRound(state)} />
             <div className="score-block">
-              <span>{displayScore(result)}</span>
+              <span>{displayScore(state, result)}</span>
               <strong>{displayRankLabel(result)}</strong>
             </div>
           </div>
@@ -188,7 +191,7 @@ function RouteSummaryRow({ state, route }: { state: CompetitionState; route: Rou
       {result && live ? (
         <>
           <RankingBoulders boulders={result.boulders} currentBoulder={live.currentBoulder} currentAttempt={live.currentAttempt} roundFinished={isFinishedRound(state)} />
-          <span className="ranking-score">{displayScore(result)}</span>
+          <span className="ranking-score">{displayScore(state, result)}</span>
         </>
       ) : (
         <>
@@ -288,7 +291,7 @@ function RankingPanel({ state, boxed = false, splitGroups = false, compactWidth 
                     <strong>{displayRankLabel(result)}</strong>
                     <AthleteName athlete={result.athlete} className="ranking-name">{displayName(result.athlete.name)}</AthleteName>
                     <RankingBoulders boulders={result.boulders} currentBoulder={live?.currentBoulder} currentAttempt={live?.currentAttempt} roundFinished={isFinishedRound(state)} />
-                    <span className="ranking-score">{displayScore(result)}</span>
+                    <span className="ranking-score">{displayScore(state, result)}</span>
                   </div>
                 );
               })}
@@ -300,7 +303,7 @@ function RankingPanel({ state, boxed = false, splitGroups = false, compactWidth 
   );
 }
 
-export function EventFeed({ events, athletes }: { events: CompetitionEvent[]; athletes: AthleteRoundResult[] }) {
+export function EventFeed({ events, athletes, formatMessage }: { events: CompetitionEvent[]; athletes: AthleteRoundResult[]; formatMessage?: (event: CompetitionEvent) => string }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const scrollKey = `ifsc-event-feed-scroll:${athletes.map((result) => result.athlete.id).join("-")}`;
   const restoredRef = useRef(false);
@@ -323,12 +326,15 @@ export function EventFeed({ events, athletes }: { events: CompetitionEvent[]; at
         }}>↑</button>
       </div>
       <div className="event-list scrollable-feed" ref={feedRef} onScroll={(event) => window.localStorage.setItem(scrollKey, String(event.currentTarget.scrollTop))}>
-        {visibleEvents.length === 0 ? <div className="empty compact-empty">No competition events in this session.</div> : visibleEvents.map((event) => (
-          <div className={`event-row ${eventTypeClass(event)}`} key={event.id}>
-            <time>{new Date(event.timestamp).toLocaleTimeString()}</time>
-            <span>{boldAthleteNames(event.message, athletes)}</span>
-          </div>
-        ))}
+        {visibleEvents.length === 0 ? <div className="empty compact-empty">No competition events in this session.</div> : visibleEvents.map((event) => {
+          const message = formatMessage?.(event) ?? event.message;
+          return (
+            <div className={`event-row ${eventTypeClass(event)}`} key={event.id}>
+              <time>{new Date(event.timestamp).toLocaleTimeString()}</time>
+              <span>{boldAthleteNames(message, athletes)}</span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -398,7 +404,7 @@ interface RankingGroup {
 }
 
 function groupedRankings(state: CompetitionState, allowSingleGroupSplit = false): RankingGroup[] {
-  const ranked = state.snapshot.athletes
+  const ranked = [...state.snapshot.athletes]
     .sort((a, b) => rankSortValue(a) - rankSortValue(b) || b.score - a.score || a.athlete.startOrder - b.athlete.startOrder);
   const names = [...new Set(ranked.map((result) => result.startingGroup).filter(Boolean))] as string[];
   if (names.length < 2) {
@@ -621,12 +627,24 @@ function displayRankLabel(result: AthleteRoundResult) {
   return `#${displayRank(result)}`;
 }
 
-function displayScore(result: AthleteRoundResult) {
-  return isDnsResult(result) ? "DNS" : result.score.toFixed(1);
+function displayScore(state: CompetitionState, result: AthleteRoundResult) {
+  return formatBoulderScore({
+    score: result.score,
+    sourceStatus: result.sourceStatus,
+    hasOfficialResult: state.snapshot.ranking.some((entry) => entry.athleteId === result.athlete.id)
+  });
 }
 
 function isDnsResult(result: AthleteRoundResult) {
   return /\bDNS\b|did not start/i.test(result.sourceStatus ?? "");
+}
+
+function displayBoulderEventMessage(state: CompetitionState, event: CompetitionEvent) {
+  if (event.type !== "RANK_CHANGED") return event.message;
+  return state.snapshot.athletes.reduce((message, result) => {
+    const scorePattern = new RegExp(`(${escapeRegExp(result.athlete.name)}\\s*\\()([^)]*)(\\))`, "g");
+    return message.replace(scorePattern, `$1${displayScore(state, result)}$3`);
+  }, event.message);
 }
 
 function shortGroupLabel(name: string) {
