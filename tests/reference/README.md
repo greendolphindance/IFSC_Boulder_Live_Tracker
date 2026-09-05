@@ -1,6 +1,6 @@
 # 独立奖牌终局参考器
 
-版本：v1.1（2026-08-31）
+版本：v1.2（2026-09-05）
 
 ## 目的与边界
 
@@ -97,7 +97,7 @@ IFSC_REFERENCE_PRODUCTION_ROOT=/absolute/path/to/target-worktree node --experime
 审计工作树没有安装依赖；静态类型检查复用主项目已有的本地 TypeScript，仅只读执行、未安装或写入：
 
 ```bash
-/Volumes/UrineBag/data/Developer/IFSC_Climbing_Live_Tracker/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --types node --typeRoots /Volumes/UrineBag/data/Developer/IFSC_Climbing_Live_Tracker/node_modules/@types tests/reference/referenceEngine.ts tests/reference/fixtures/scenarios.ts tests/reference/medalChances.logic.test.ts tests/reference/medalChances.copy.test.ts
+./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --types node --typeRoots ./node_modules/@types tests/reference/referenceEngine.ts tests/reference/fixtures/scenarios.ts tests/reference/medalChances.logic.test.ts tests/reference/medalChances.copy.test.ts
 ```
 
 类型检查结果：退出码 0。
@@ -119,3 +119,4 @@ IFSC_REFERENCE_PRODUCTION_ROOT=/absolute/path/to/target-worktree node --experime
 |---|---|---|
 | v1.0 | 2026-08-31 | 建立独立有限世界参考器、分层逻辑/英文测试、场景证据、两个永久反例与盲点说明。 |
 | v1.1 | 2026-08-31 | 更新 Lead DNS 修复后的当前集成状态，并保留修复前控制命令作为历史证据。 |
+| v1.2 | 2026-09-05 | 将 reference 类型检查示例改为仓库相对路径，避免披露本机目录并提高可移植性。 |
