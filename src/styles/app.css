@@ -2784,3 +2784,316 @@ pre {
     transition: none;
   }
 }
+
+/* ============================================================================
+   Medal Chances tab（CHG-001）· 只追加不改现有 class
+   像素级对齐 01.5-视觉规范.md + attachments/demo/index.html（视觉冻结契约）
+   颜色全部命中 01.5 §一/§六/§七 登记 hex；复用现有 .panel/.section-title/.tabs button
+   ============================================================================ */
+
+.medal-layout { display: block; }
+
+/* —— 页面级免责小注（Loop-5 item4：无框无叹号灰小字，标题下一行 · 仅数据存疑时出）——
+   选择器带 p 元素：需压过既有 .theme-dark p（app.css:1584 · 特异性 0,1,1）的正文灰 #94a8ba */
+p.section-subnote {
+  margin: 0 0 11px;
+  padding: 0;
+  color: #7f92a3;                       /* app.css:573 标题下说明灰 */
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+/* —— 图例（真实 UI · 左侧符号图例 · Loop-5 item3：符号色随文字色）—— */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 10px 12px;
+  border: 1px dashed #2b4962;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.legend .lg-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #b7c5d3; }
+.legend .lg-swatch { width: 14px; height: 14px; border-radius: 999px; }
+/* lg-swatch 纯色样本（01.5 §四.1）· 用 §一.1 登记状态色（demo CSS 欠着色，按规范意图补齐）*/
+.legend .lg-swatch.st-locked  { background: #5df0a4; }
+.legend .lg-swatch.st-out     { background: #ff6b6b; }
+.legend .lg-swatch.st-need    { background: #ffd166; }
+.legend .lg-swatch.st-unknown { background: #94a8ba; }
+.legend .lg-glyph { font-size: 11px; font-weight: 900; color: inherit; line-height: 1; }  /* item3: 符号随文字色 */
+
+/* —— 列表容器 —— */
+.medal-list { display: grid; gap: 4px; }                      /* app.css .ranking-list:583 gap 4px */
+
+/* —— 表头身份点行（item3①：身份点簇仅此处出现）—— */
+.medal-head {
+  display: grid;
+  grid-template-columns: 38px 78px minmax(0, 1fr);            /* 名次 | 3 状态列(26×3) | 名字 */
+  gap: 12px;                                                  /* item2d 三大列 gap ×1.2 */
+  align-items: end;
+  padding: 2px 12px 6px 8px;
+}
+.medal-head .mh-rank { font-size: 10px; color: #7f92a3; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; }
+.medal-head .mh-ids { display: grid; grid-template-columns: repeat(3, 26px); gap: 0; }  /* item2c 簇内 26px */
+.medal-head .mh-id-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.medal-head .mh-name { font-size: 10px; color: #7f92a3; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; align-self: end; text-align: left; }
+
+/* 身份点（item7：8px 纯色圆点 · 仅表头+展开区行首）· 金银铜色见 01.5 §七登记 */
+.medal-id { width: 8px; height: 8px; border-radius: 999px; }
+.medal-id.gold   { background: #d99a3c; }   /* item9 鲜艳暖金（日夜同色）*/
+.medal-id.silver { background: #aeb9c4; }   /* item13 比问号灰更浅 */
+.medal-id.bronze { background: #a9744e; }
+
+/* —— 选手行（名次 → 3 状态标记 → 名字 · 行内无身份点簇）—— */
+.medal-row {
+  display: grid;
+  grid-template-columns: 38px 78px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  height: 44px;
+  padding: 4px 12px 4px 8px;
+  border: 1px solid #2b4962;            /* route-tile 描边:382 */
+  border-radius: 8px;                   /* boxed row radius:816 */
+  background: #0b1219;                   /* route-tile 底:385 */
+  cursor: pointer;
+  position: relative;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.medal-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #070a0f, 0 0 0 4px #7fd7ff;   /* name-link focus:2773 */
+}
+.medal-rank {
+  color: #9db2c4; font-size: 13px; font-weight: 900; text-align: left;   /* item2a 左对齐 */
+  font-variant-numeric: tabular-nums;
+}
+.medal-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #dce8f2; font-size: 13px; font-weight: 800; text-align: left;   /* ranking-name:855 */
+}
+
+/* 三状态标记（每列上下对齐表头身份点列）*/
+.medal-dots { display: grid; grid-template-columns: repeat(3, 26px); gap: 0; }
+.medal-dot-wrap { display: flex; align-items: center; justify-content: center; }
+.mdot {
+  width: 14px; height: 14px; border-radius: 999px; border: 1px solid transparent;
+  display: grid; place-items: center; font-size: 8px; line-height: 1;
+}
+/* 四态色（夜间基线 · item12 对齐 Event Feed）*/
+.mdot.st-locked  { background: #5df0a4; }   /* Condition met 绿 · event-top:1683 */
+.mdot.st-out     { background: #ff6b6b; }   /* Out of contention 红 · event-fall:1674 */
+.mdot.st-need    { background: #ffd166; }   /* Needs conditions 琥珀 · event-appeal:1679 */
+.mdot.st-unknown { background: #94a8ba; }   /* Not yet decided 灰 · p:129 */
+.mdot .glyph { color: #06121b; font-weight: 900; }
+
+/* 名字列：仅展开箭头右对齐（item2e）*/
+.medal-name-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.medal-arrow {
+  width: 18px; height: 18px; display: grid; place-items: center; flex: 0 0 auto;
+  margin-left: auto;                    /* item2e 唯一右对齐元素 */
+  color: #7f92a3; font-size: 12px; line-height: 1;
+  transition: transform 150ms ease;
+  transform: rotate(0deg);
+}
+.medal-row.expanded .medal-arrow { transform: rotate(90deg); }
+
+@media (min-width: 1024px) {
+  .medal-row:hover { background: #101a24; border-color: #3b6a8f; }
+  .medal-row:active { background: #23648f; border-color: #7fd7ff; }   /* :active:1978 */
+}
+
+/* —— 展开区（item9 四边统一 1px 强调边）—— */
+.medal-detail {
+  display: none;
+  margin: 2px 0 6px;
+  border: 1px solid #7fd7ff;
+  border-radius: 8px;
+  background: #0b1219;
+  padding: 12px;
+  animation: medal-expand 180ms ease;
+}
+.medal-row.expanded + .medal-detail { display: block; }
+@keyframes medal-expand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 展开区金/银/铜竖排三行 */
+.medal-line {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom: 1px solid #172536;     /* ranking-row divider:804 */
+}
+.medal-line:last-child { border-bottom: 0; }
+.medal-line .ml-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 900; color: #d8e8f5;
+}
+.medal-line .ml-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+.medal-line .ml-dot.gold   { background: #d99a3c; }
+.medal-line .ml-dot.silver { background: #aeb9c4; }
+.medal-line .ml-dot.bronze { background: #a9744e; }
+.ml-body { min-width: 0; display: grid; gap: 6px; }
+
+/* verdict 行：徽章 + 行内 (reference only…) 括注同一行（item4(4)）*/
+.verdict-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+.verdict {
+  display: inline-flex; align-items: center; gap: 5px; align-self: start;
+  height: 22px; padding: 0 10px;
+  border-radius: 999px; border: 1px solid transparent;
+  font-size: 11px; font-weight: 900; white-space: nowrap;
+}
+.verdict .v-glyph { font-size: 10px; }
+.verdict.st-locked  { background: rgba(93,240,164,0.16); border-color: #5df0a4; color: #5df0a4; }
+.verdict.st-out     { background: rgba(255,107,107,0.16); border-color: #ff6b6b; color: #ff8f8f; }
+.verdict.st-need    { background: rgba(255,209,102,0.16); border-color: #ffd166; color: #ffd166; }
+.verdict.st-unknown { background: rgba(148,168,186,0.16); border-color: #94a8ba; color: #b7c5d3; }
+
+/* 理由 / 条件文字（item5 默认字色）*/
+.ml-reason { color: #dce8f2; font-size: 12px; line-height: 1.45; }
+.ml-condition { color: #dce8f2; font-size: 12px; line-height: 1.5; }
+.ml-condition b { color: #7fd7ff; font-weight: 900; }
+
+/* 行内免责括注（item4(4)：默认字色、无框、同行）*/
+.ref-note {
+  margin-left: 6px;
+  color: #dce8f2;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+
+/* 轮换控件（N/M 计数 + 图标钮 · 仅 >1 组合时）*/
+.rotator { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.rotator .rot-count {
+  font-size: 11px; font-weight: 900; color: #9db2c4;
+  font-variant-numeric: tabular-nums;
+}
+
+/* >5 组合退化概括句（item5 默认字色 · 无轮换）*/
+.ml-degrade { color: #dce8f2; font-size: 12px; line-height: 1.5; font-style: normal; }
+
+/* 轮换图标钮（Loop-7：仿放大镜按钮 28×28 圆角方钮 · 静态环形箭头 ↻）*/
+.refresh-btn {
+  width: 28px; height: 28px; flex: 0 0 auto; padding: 0;
+  border: 1px solid #3b84b6; border-radius: 5px;        /* feed-top-button:1015-1016 */
+  background: #143047; color: #ffffff;                  /* :1017-1018 */
+  cursor: pointer; display: grid; place-items: center;
+  font-size: 15px; font-weight: 900; line-height: 1;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+@media (min-width: 1024px) {
+  .refresh-btn:hover  { background: #143047; border-color: #7fd7ff; }
+  .refresh-btn:active { background: #23648f; border-color: #7fd7ff; }
+}
+.refresh-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px #070a0f, 0 0 0 3px #7fd7ff; }
+.refresh-btn .rf-glyph { display: inline-block; }
+
+/* —— 5 态：loading 骨架 / empty / error —— */
+.skel-row { display: grid; grid-template-columns: 38px 78px 1fr; gap: 12px; align-items: center; height: 44px; padding: 4px 8px; }
+.skel { height: 14px; border-radius: 4px; background: #16232f; position: relative; overflow: hidden; }
+.skel.wide { height: 12px; }
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(127,215,255,0.12), transparent);
+  animation: skel-shimmer 1.1s ease-in-out infinite;
+}
+@keyframes skel-shimmer { 100% { transform: translateX(200%); } }
+.skel-caption { margin-top: 8px; color: #94a8ba; font-size: 12px; }
+
+.empty-state { display: grid; gap: 8px; padding: 22px 4px; text-align: left; }
+.empty-state .es-title { color: #d8e8f5; font-size: 14px; font-weight: 900; }
+.empty-state .es-desc { color: #94a8ba; font-size: 12px; line-height: 1.5; }
+
+.error-state { display: grid; gap: 10px; }
+.error-state .er-msg { color: #ffd166; font-size: 13px; font-weight: 800; }   /* 琥珀=Event Feed appeal */
+.error-state .er-hint { color: #94a8ba; font-size: 12px; }
+.error-state .er-retry { display: inline-flex; align-items: center; gap: 8px; color: #7fd7ff; font-size: 12px; font-weight: 800; }
+.retry-spinner {
+  display: inline-block; font-size: 14px; line-height: 1; color: #7fd7ff;
+  animation: retry-spin 900ms linear infinite;
+}
+@keyframes retry-spin { to { transform: rotate(360deg); } }
+
+/* ================= Medal · 日间主题（.theme-light 覆盖 · 01.5 §六）================= */
+.theme-light .ml-reason, .theme-light .ml-degrade { color: #182433; }
+.theme-light .medal-name { color: #182433; }               /* ranking-name day:1806 */
+.theme-light .medal-rank { color: #5d6f82; }               /* ranking-row strong day:1799 */
+.theme-light .medal-line .ml-label { color: #182433; }
+.theme-light .ml-condition { color: #182433; }
+.theme-light .ml-condition b { color: #1c6fa0; }
+.theme-light .medal-head .mh-rank,
+.theme-light .medal-head .mh-name { color: #6b7785; }
+.theme-light p.section-subnote { color: #6b7785; }
+.theme-light .medal-row, .theme-light .medal-detail {
+  background: #ffffff; border-color: #cdd8e5;               /* day card:1763-1765 */
+}
+.theme-light .medal-detail { border-color: #2490c3; }      /* day accent edge 1px */
+.theme-light .medal-row:focus-visible { box-shadow: 0 0 0 2px #f5f7fb, 0 0 0 4px #1c6fa0; }
+@media (min-width: 1024px) {
+  .theme-light .medal-row:hover { background: #eef4fb; border-color: #2490c3; }
+  .theme-light .medal-row:active { background: #8fc7ee; border-color: #2490c3; }
+}
+.theme-light .medal-line { border-bottom-color: #dbe3ed; }
+.theme-light .medal-arrow { color: #5d6f82; }
+
+/* 日间四态状态点（item12：红/绿/琥珀=Event Feed day；灰调浅一档）*/
+.theme-light .mdot.st-locked  { background: #008e4f; }
+.theme-light .mdot.st-out     { background: #d71920; }
+.theme-light .mdot.st-need    { background: #d39200; }
+.theme-light .mdot.st-unknown { background: #8794a3; }
+.theme-light .mdot .glyph { color: #ffffff; }
+
+/* 日间结论徽章 */
+.theme-light .verdict.st-locked  { background: rgba(0,142,79,0.12);  border-color: #008e4f; color: #008e4f; }
+.theme-light .verdict.st-out     { background: rgba(215,25,32,0.10);  border-color: #d71920; color: #d71920; }
+.theme-light .verdict.st-need    { background: rgba(211,146,0,0.12);  border-color: #d39200; color: #b06f00; }
+.theme-light .verdict.st-unknown { background: rgba(93,111,130,0.12); border-color: #8da0b3; color: #5d6f82; }
+
+.theme-light .ref-note { color: #182433; }
+.theme-light .rot-count { color: #5d6f82; }
+.theme-light .error-state .er-msg { color: #b06f00; }
+.theme-light .error-state .er-retry { color: #1c6fa0; }
+.theme-light .refresh-btn { background: #cfe4fb; border-color: #2490c3; color: #0b2239; }  /* 放大镜钮 day */
+@media (min-width: 1024px) {
+  .theme-light .refresh-btn:hover  { background: #cfe4fb; border-color: #2490c3; }
+  .theme-light .refresh-btn:active { background: #8fc7ee; border-color: #2490c3; }
+}
+.theme-light .refresh-btn:focus-visible { box-shadow: 0 0 0 2px #f5f7fb, 0 0 0 3px #1c6fa0; }
+.theme-light .skel { background: #e4ecf5; }
+.theme-light .skel::after { background: linear-gradient(90deg, transparent, rgba(36,144,195,0.14), transparent); }
+.theme-light .skel-caption { color: #5d6f82; }
+.theme-light .empty-state .es-title { color: #182433; }
+.theme-light .empty-state .es-desc { color: #5d6f82; }
+.theme-light .error-state .er-hint { color: #5d6f82; }
+.theme-light .legend { border-color: #cdd8e5; }
+.theme-light .legend .lg-item { color: #5d6f82; }
+/* 日间身份点（item13 银 #a7b1bd 比日间问号灰 #8794a3 浅 · item9 金日夜同色）*/
+.theme-light .medal-id.gold,   .theme-light .medal-line .ml-dot.gold   { background: #d99a3c; }
+.theme-light .medal-id.silver, .theme-light .medal-line .ml-dot.silver { background: #a7b1bd; }
+.theme-light .medal-id.bronze, .theme-light .medal-line .ml-dot.bronze { background: #8f5c38; }
+/* 日间图例 swatch（§六.1 日间状态色）*/
+.theme-light .legend .lg-swatch.st-locked  { background: #008e4f; }
+.theme-light .legend .lg-swatch.st-out     { background: #d71920; }
+.theme-light .legend .lg-swatch.st-need    { background: #d39200; }
+.theme-light .legend .lg-swatch.st-unknown { background: #8794a3; }
+
+/* ================= Medal · 窄屏断点（≤1023px · app.css:2149 真实断点）================= */
+@media (max-width: 1023px) {
+  .medal-head, .medal-row { grid-template-columns: 30px 72px minmax(0,1fr); gap: 10px; }  /* item2c/2d 窄屏 */
+  .medal-head .mh-ids, .medal-dots { grid-template-columns: repeat(3, 24px); }
+  .medal-row { height: 42px; padding: 4px 8px; }
+  .medal-name { font-size: 12px; }                 /* ranking-name narrow:2547 */
+  .medal-detail { padding: 10px; }
+  .medal-line { grid-template-columns: 76px minmax(0,1fr); gap: 8px; }
+}
+
+/* ================= Medal · prefers-reduced-motion ================= */
+@media (prefers-reduced-motion: reduce) {
+  .medal-arrow, .medal-detail, .medal-row, .refresh-btn, .retry-spinner, .skel::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
