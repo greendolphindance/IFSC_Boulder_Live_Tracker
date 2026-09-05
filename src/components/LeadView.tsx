@@ -48,7 +48,7 @@ export function LeadView({ state, mode }: { state: CompetitionState; mode: "colu
 function LeadColumns({ athletes, roundType, events, state }: { athletes: LeadResult[]; roundType: string; events: CompetitionState["events"]; state: CompetitionState }) {
   const active = athletes.find((athlete) => athlete.status === "climbing");
   const next = active ? athletes.find((athlete) => athlete.next) ?? athletes.find((athlete) => athlete.status === "waiting") : undefined;
-  const ranked = [...athletes].sort((a, b) => leadRankSortValue(a) - leadRankSortValue(b) || b.hold - a.hold || a.athlete.startOrder - b.athlete.startOrder);
+  const ranked = [...athletes].sort((a, b) => leadRankSortValue(a) - leadRankSortValue(b) || b.hold - a.hold || b.athlete.startOrder - a.athlete.startOrder);
   const appealIds = new Set(state.snapshot.appeals.filter((appeal) => appeal.status === "Under Appeal" || appeal.status === "Pending").map((appeal) => appeal.athleteId));
 
   return (
@@ -211,7 +211,7 @@ function leadAxisPoints(athletes: LeadResult[]): LeadAxisPoint[] {
   }
 
   for (const group of grouped.values()) {
-    const sorted = group.sort((a, b) => a.rank - b.rank || a.athlete.startOrder - b.athlete.startOrder);
+    const sorted = group.sort((a, b) => a.rank - b.rank || b.athlete.startOrder - a.athlete.startOrder);
     points.push({
       key: sorted.map((athlete) => athlete.athlete.id).join("-"),
       status: sorted.some((athlete) => athlete.status === "top") ? "top" : sorted[0].status,
