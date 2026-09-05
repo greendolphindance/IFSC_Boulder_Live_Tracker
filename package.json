@@ -8,6 +8,10 @@
     "dev:server": "tsx watch server/src/index.ts",
     "dev:client": "vite --host 0.0.0.0",
     "build": "npm run check && vite build",
+    "test": "npm run test:backend && npm run test:frontend && npm run test:reference",
+    "test:backend": "tsx --test tests/backend/**/*.test.ts",
+    "test:frontend": "tsx --test tests/frontend/format.test.ts tests/frontend/live-view.browser.test.ts",
+    "test:reference": "node --experimental-transform-types --loader ./tests/reference/ts-loader.mjs --test --test-reporter=spec tests/reference/medalChances.logic.test.ts tests/reference/medalChances.copy.test.ts",
     "preview": "vite preview --host 0.0.0.0",
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json",
     "probe:ifsc": "tsx scripts/probe-ifsc.ts"

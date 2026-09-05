@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { LeadView } from "./components/LeadView";
 import { LiveView } from "./components/LiveView";
+import { MedalView } from "./components/MedalView";
 import { useCompetitionState } from "./lib/useCompetitionState";
 
-type Tab = "routes" | "athletes" | "feed" | "columns" | "axis";
+type Tab = "routes" | "athletes" | "feed" | "columns" | "axis" | "medal";
 
 export function App() {
   const [tab, setTab] = useState<Tab>(() => readStoredTab());
@@ -54,6 +55,8 @@ export function App() {
     if (!state) return;
     if (discipline === "lead" && (tab === "routes" || tab === "athletes")) setTab("columns");
     if (discipline !== "lead" && (tab === "columns" || tab === "axis")) setTab("routes");
+    // Medal Chances 仅决赛轮产出：非决赛轮（medalChances 缺）时回落默认 tab（TC-MEDAL-037）。
+    if (tab === "medal" && !state.medalChances) setTab(discipline === "lead" ? "columns" : "routes");
   }, [discipline, state, tab]);
 
   useEffect(() => {
@@ -124,12 +127,14 @@ export function App() {
               </>
             )}
             <button className={`feed-tab ${tab === "feed" ? "active" : ""}`} onClick={() => setTab("feed")}>Event Feed</button>
+            {state.medalChances && <button className={tab === "medal" ? "active" : ""} onClick={() => setTab("medal")}>Medal Chances</button>}
           </nav>
 
-          {discipline === "lead" && tab !== "feed" && <LeadView state={state} mode={tab === "axis" ? "axis" : "columns"} />}
+          {discipline === "lead" && tab !== "feed" && tab !== "medal" && <LeadView state={state} mode={tab === "axis" ? "axis" : "columns"} />}
           {discipline !== "lead" && tab === "routes" && <LiveView state={state} mode="routes" />}
           {discipline !== "lead" && tab === "athletes" && <LiveView state={state} mode="athletes" />}
           {tab === "feed" && <LiveView state={state} mode="feed" />}
+          {tab === "medal" && state.medalChances && <MedalView state={state} error={error} />}
         </>
       ) : (
         <section className={`panel ${error ? "error-panel" : "loading-panel"}`}>
@@ -155,7 +160,7 @@ function systemTheme(): "theme-dark" | "theme-light" {
 function readStoredTab(): Tab {
   if (typeof window === "undefined") return "routes";
   const value = window.localStorage.getItem("ifsc-live-tab");
-  return value === "routes" || value === "athletes" || value === "feed" || value === "columns" || value === "axis" ? value : "routes";
+  return value === "routes" || value === "athletes" || value === "feed" || value === "columns" || value === "axis" || value === "medal" ? value : "routes";
 }
 
 function readStoredThemeOverride(): "theme-dark" | "theme-light" | undefined {
